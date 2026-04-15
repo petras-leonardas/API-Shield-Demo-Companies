@@ -50,6 +50,7 @@ app.get("/:category_id/products", (c) => {
       price: p.price,
       currency: p.currency,
       rating: p.rating,
+      review_count: p.review_count,
       in_stock: p.in_stock,
       image: p.images[0] || null,
     })),

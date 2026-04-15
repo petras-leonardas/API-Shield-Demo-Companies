@@ -33,6 +33,8 @@ import orderRoutes from "./routes/orders";
 import sellerRoutes from "./routes/sellers";
 import webhookRoutes from "./routes/webhooks";
 import internalRoutes from "./routes/internal";
+import graphqlRoutes from "./routes/graphql";
+import rateLimitedRoutes from "./routes/rate-limited";
 import { createGeneratedRoutes } from "./generated/handler";
 
 const app = new Hono();
@@ -64,6 +66,12 @@ app.route("/api/v2/sellers", sellerRoutes);
 
 // Webhooks (mTLS at CF level, 2 endpoints)
 app.route("/api/v2/webhooks", webhookRoutes);
+
+// GraphQL (JWT auth, single endpoint with varied operations)
+app.route("/api/v2/graphql", graphqlRoutes);
+
+// Rate-limited test endpoints (for rate limiting rule testing)
+app.route("/api/v2/rate-test", rateLimitedRoutes);
 
 // ─── Internal Routes (no auth -- "accidentally" exposed) ────────────
 app.route("/internal", internalRoutes);

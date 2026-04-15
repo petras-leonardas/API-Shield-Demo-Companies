@@ -2,63 +2,96 @@ name: CartNova Traffic Generator
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 jobs:
-  # Job 1: Core commerce traffic (checkout, browsing, user activity, seller)
+  # Job 1: Core commerce (checkout, browsing, user activity, seller)
   core-traffic:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Install dependencies
+      - run: npm install
         working-directory: cartnova/traffic
-        run: npm install
       - name: Generate core commerce traffic
         working-directory: cartnova/traffic
         env:
           JOB_TYPE: core
-          DURATION_MINUTES: "4"
+          DURATION_MINUTES: "9"
         run: npx tsx src/ci-runner.ts
 
-  # Job 2: Expanded domain traffic (admin, inventory, finance, etc.)
+  # Job 2: Expanded domains (admin, inventory, finance, marketing, etc.)
   expanded-traffic:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Install dependencies
+      - run: npm install
         working-directory: cartnova/traffic
-        run: npm install
       - name: Generate expanded domain traffic
         working-directory: cartnova/traffic
         env:
           JOB_TYPE: expanded
-          DURATION_MINUTES: "4"
+          DURATION_MINUTES: "9"
         run: npx tsx src/ci-runner.ts
 
-  # Job 3: Error traffic + bot/crawler simulation + webhooks
+  # Job 3: Error traffic + bots/crawlers
   errors-bots-traffic:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Install dependencies
+      - run: npm install
         working-directory: cartnova/traffic
-        run: npm install
       - name: Generate error and bot traffic
         working-directory: cartnova/traffic
         env:
           JOB_TYPE: errors-bots
-          DURATION_MINUTES: "4"
+          DURATION_MINUTES: "9"
+        run: npx tsx src/ci-runner.ts
+
+  # Job 4: GraphQL traffic (queries + mutations, browser + mobile)
+  graphql-traffic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install
+        working-directory: cartnova/traffic
+      - name: Generate GraphQL traffic
+        working-directory: cartnova/traffic
+        env:
+          JOB_TYPE: graphql
+          DURATION_MINUTES: "9"
+        run: npx tsx src/ci-runner.ts
+
+  # Job 5: Rate limiting + versioning drift + mixed patterns
+  special-traffic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install
+        working-directory: cartnova/traffic
+      - name: Generate special traffic patterns
+        working-directory: cartnova/traffic
+        env:
+          JOB_TYPE: special
+          DURATION_MINUTES: "9"
         run: npx tsx src/ci-runner.ts

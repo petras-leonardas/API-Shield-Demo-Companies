@@ -4,10 +4,12 @@
 // Designed for GitHub Actions. Runs batches for a fixed duration, then exits.
 // Supports a JOB_TYPE env var to run different traffic profiles in parallel.
 //
-// Usage:
-//   JOB_TYPE=core DURATION_MINUTES=4 npx tsx src/ci-runner.ts
-//   JOB_TYPE=expanded DURATION_MINUTES=4 npx tsx src/ci-runner.ts
-//   JOB_TYPE=errors-bots DURATION_MINUTES=4 npx tsx src/ci-runner.ts
+// Job types:
+//   core        — checkout, browsing, user activity, seller
+//   expanded    — admin, inventory, finance, marketing + webhooks
+//   errors-bots — error traffic, crawlers, scanners, scrapers
+//   graphql     — GraphQL queries and mutations
+//   special     — rate limiting, versioning drift, mixed patterns
 
 import { checkoutJourney } from "./journeys/checkout";
 import { browsingJourney } from "./journeys/browsing";
@@ -21,6 +23,9 @@ import {
 import { errorTrafficJourney } from "./journeys/errors";
 import { searchCrawlerJourney, scannerJourney, uptimeMonitorJourney, scraperJourney } from "./journeys/bots";
 import { webhookJourney } from "./journeys/webhooks";
+import { graphqlJourney, mobileGraphqlJourney } from "./journeys/graphql";
+import { rateLimitJourney } from "./journeys/rate-limit";
+import { legacyMobileJourney, mixedVersionJourney, futureVersionJourney } from "./journeys/versioning";
 import { api, getResults, setClientProfile, randomClientProfile } from "./http";
 
 const DURATION_MS = (parseInt(process.env.DURATION_MINUTES || "4") || 4) * 60 * 1000;
@@ -47,7 +52,6 @@ async function wave(...fns: [string, () => Promise<void>][]): Promise<void> {
 // ── Batch Definitions Per Job Type ──────────────────────────────────
 
 async function coreBatch(): Promise<void> {
-  // Vary client profiles per journey
   setClientProfile(randomClientProfile());
   await wave(["browse-1", browsingJourney], ["browse-2", browsingJourney], ["checkout-1", checkoutJourney]);
   setClientProfile(randomClientProfile());
@@ -59,7 +63,6 @@ async function coreBatch(): Promise<void> {
   setClientProfile(randomClientProfile());
   await wave(["browse-6", browsingJourney], ["checkout-5", checkoutJourney], ["browse-7", browsingJourney]);
 
-  // Monitoring
   await safe("monitoring", async () => {
     await api("GET", "/internal/health");
     await api("GET", "/internal/metrics");
@@ -67,7 +70,6 @@ async function coreBatch(): Promise<void> {
 }
 
 async function expandedBatch(): Promise<void> {
-  // Pick 6 random expanded domains
   const expanded = pickRandom(EXPANDED_POOL, 6);
   setClientProfile("browser");
   await wave(["exp-1", expanded[0]], ["exp-2", expanded[1]]);
@@ -76,28 +78,45 @@ async function expandedBatch(): Promise<void> {
   setClientProfile("integration");
   await wave(["exp-5", expanded[4]], ["exp-6", expanded[5]]);
 
-  // Add some webhook traffic
   await safe("webhook-1", webhookJourney);
   await safe("webhook-2", webhookJourney);
 }
 
 async function errorsBotsBatch(): Promise<void> {
-  // Error traffic
   setClientProfile("browser");
   await safe("errors", errorTrafficJourney);
-
-  // Bot traffic -- various types
   await safe("crawler", searchCrawlerJourney);
   await safe("scanner", scannerJourney);
   await safe("uptime", uptimeMonitorJourney);
-
-  // Scraper (burst pattern)
   if (Math.random() < 0.5) {
     await safe("scraper", scraperJourney);
   }
-
-  // More webhooks
   await safe("webhook", webhookJourney);
+}
+
+async function graphqlBatch(): Promise<void> {
+  // Browser GraphQL session
+  await safe("graphql-browser", graphqlJourney);
+  // Mobile GraphQL session
+  await safe("graphql-mobile", mobileGraphqlJourney);
+  // Another browser session with different user
+  await safe("graphql-browser-2", graphqlJourney);
+  // Another mobile session
+  await safe("graphql-mobile-2", mobileGraphqlJourney);
+}
+
+async function specialBatch(): Promise<void> {
+  // Rate limiting tests
+  await safe("rate-limit", rateLimitJourney);
+  // Legacy mobile on v1
+  await safe("legacy-mobile", legacyMobileJourney);
+  // Partner mid-migration (v1+v2 mix)
+  await safe("mixed-version", mixedVersionJourney);
+  // Developer trying v3
+  await safe("future-version", futureVersionJourney);
+  // Extra browsing for volume
+  setClientProfile(randomClientProfile());
+  await wave(["browse-1", browsingJourney], ["browse-2", browsingJourney]);
 }
 
 // ── Main Loop ───────────────────────────────────────────────────────
@@ -106,6 +125,8 @@ const BATCH_FNS: Record<string, () => Promise<void>> = {
   core: coreBatch,
   expanded: expandedBatch,
   "errors-bots": errorsBotsBatch,
+  graphql: graphqlBatch,
+  special: specialBatch,
 };
 
 async function main() {
@@ -128,7 +149,6 @@ async function main() {
 
     const results = getResults();
     const ok = results.filter((r) => r.ok).length;
-    const dur = results.reduce((s, r) => s + r.duration, 0);
     console.log(`  ${results.length} requests | ${ok} ok | ${results.length - ok} failed`);
 
     totalRequests += results.length;
