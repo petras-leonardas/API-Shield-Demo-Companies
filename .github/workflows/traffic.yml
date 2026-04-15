@@ -2,30 +2,63 @@ name: CartNova Traffic Generator
 
 on:
   schedule:
-    # Run every 5 minutes (GitHub Actions minimum cron interval)
     - cron: "*/5 * * * *"
-  workflow_dispatch: # Allow manual trigger from GitHub UI
+  workflow_dispatch:
 
 jobs:
-  generate-traffic:
+  # Job 1: Core commerce traffic (checkout, browsing, user activity, seller)
+  core-traffic:
     runs-on: ubuntu-latest
     timeout-minutes: 6
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "22"
-
       - name: Install dependencies
         working-directory: cartnova/traffic
         run: npm install
-
-      - name: Run traffic generator (4 minutes)
+      - name: Generate core commerce traffic
         working-directory: cartnova/traffic
         env:
+          JOB_TYPE: core
+          DURATION_MINUTES: "4"
+        run: npx tsx src/ci-runner.ts
+
+  # Job 2: Expanded domain traffic (admin, inventory, finance, etc.)
+  expanded-traffic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install dependencies
+        working-directory: cartnova/traffic
+        run: npm install
+      - name: Generate expanded domain traffic
+        working-directory: cartnova/traffic
+        env:
+          JOB_TYPE: expanded
+          DURATION_MINUTES: "4"
+        run: npx tsx src/ci-runner.ts
+
+  # Job 3: Error traffic + bot/crawler simulation + webhooks
+  errors-bots-traffic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install dependencies
+        working-directory: cartnova/traffic
+        run: npm install
+      - name: Generate error and bot traffic
+        working-directory: cartnova/traffic
+        env:
+          JOB_TYPE: errors-bots
           DURATION_MINUTES: "4"
         run: npx tsx src/ci-runner.ts

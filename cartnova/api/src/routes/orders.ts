@@ -6,7 +6,7 @@
 // GET /orders (list) correctly filters by the authenticated user.
 
 import { Hono } from "hono";
-import { orders, getOrdersForUser } from "../data/seed";
+import { orders, getOrdersForUser, products } from "../data/seed";
 import { jwtAuth } from "../middleware/jwt";
 
 const app = new Hono();
@@ -48,10 +48,19 @@ app.get("/:order_id", (c) => {
   }
 
   // Returns full PII: shipping name, address, phone + payment details
+  // Enrich items with product images
+  const enrichedItems = order.items.map((item) => {
+    const product = products.find((p) => p.id === item.product_id);
+    return {
+      ...item,
+      image: product?.images?.[0] || null,
+    };
+  });
+
   return c.json({
     id: order.id,
     status: order.status,
-    items: order.items,
+    items: enrichedItems,
     shipping: order.shipping,
     payment: order.payment,
     created_at: order.created_at,

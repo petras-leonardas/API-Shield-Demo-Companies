@@ -11,7 +11,7 @@
 //   GET /api/v2/products/:id/variants
 
 import { PRODUCT_IDS, CATEGORY_IDS, SEARCH_TERMS } from "../config";
-import { api, humanDelay, pick, chance, randInt } from "../http";
+import { api, humanDelay, pick, chance, randInt, setClientProfile, randomClientProfile } from "../http";
 
 /**
  * Search-first browsing: user searches, then drills into results.
@@ -126,6 +126,7 @@ export async function catalogBrowsingSession(): Promise<void> {
  * Run a random browsing session (picks one of three patterns).
  */
 export async function browsingJourney(): Promise<void> {
+  setClientProfile(randomClientProfile());
   const roll = Math.random();
 
   if (roll < 0.4) {

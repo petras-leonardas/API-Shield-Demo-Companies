@@ -79,12 +79,15 @@ async function loadProducts() {
   }
 
   container.innerHTML = data.products.map((p) => `
-    <div class="flex items-center justify-between border border-gray-200 rounded-lg p-3">
-      <div>
-        <p class="font-medium text-gray-900 text-sm">${p.name}</p>
+    <div class="flex items-center gap-3 border border-gray-200 rounded-lg p-3">
+      ${p.image
+        ? `<img src="${p.image}" alt="${p.name}" class="w-12 h-12 rounded-lg object-cover shrink-0" onerror="this.style.display='none'">`
+        : `<div class="w-12 h-12 rounded-lg bg-gray-100 shrink-0"></div>`}
+      <div class="flex-1 min-w-0">
+        <p class="font-medium text-gray-900 text-sm truncate">${p.name}</p>
         <p class="text-xs text-gray-500">${p.id} — ${p.in_stock ? "In Stock" : "Out of Stock"}</p>
       </div>
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-3 shrink-0">
         <span class="font-semibold text-gray-900">&euro;${p.price.toFixed(2)}</span>
         <button onclick="updateProduct('${p.id}', ${p.price})"
           class="text-xs text-indigo-600 hover:underline">Edit Price</button>

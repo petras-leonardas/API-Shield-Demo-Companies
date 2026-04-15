@@ -70,8 +70,11 @@
           <h3 class="font-semibold text-gray-900 text-sm mb-2">Items</h3>
           <div class="space-y-2">
             ${(order.items || []).map((item) => `
-              <div class="flex justify-between text-sm">
-                <span class="text-gray-700">${item.name} x${item.quantity}</span>
+              <div class="flex items-center gap-3 text-sm">
+                ${item.image
+                  ? `<img src="${item.image}" alt="${item.name}" class="w-10 h-10 rounded object-cover shrink-0" onerror="this.style.display='none'">`
+                  : `<div class="w-10 h-10 rounded bg-gray-100 shrink-0"></div>`}
+                <span class="text-gray-700 flex-1">${item.name} x${item.quantity}</span>
                 <span class="font-medium text-gray-900">&euro;${(item.price * item.quantity).toFixed(2)}</span>
               </div>
             `).join("")}

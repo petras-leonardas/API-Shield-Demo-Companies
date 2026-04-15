@@ -15,7 +15,19 @@ app.get("/", (c) => {
   const userId = c.get("userId");
   const cart = getCartForUser(userId);
 
-  return c.json(cart);
+  // Enrich cart items with product images
+  const enrichedItems = cart.items.map((item) => {
+    const product = products.find((p) => p.id === item.product_id);
+    return {
+      ...item,
+      image: product?.images?.[0] || null,
+    };
+  });
+
+  return c.json({
+    ...cart,
+    items: enrichedItems,
+  });
 });
 
 // POST /api/v2/cart/items -- Add item to cart

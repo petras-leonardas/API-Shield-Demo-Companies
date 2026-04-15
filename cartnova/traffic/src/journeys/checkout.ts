@@ -18,9 +18,10 @@
 //   GET  /api/v2/checkout/:id/status
 
 import { USERS, PRODUCT_IDS, SHIPPING_ADDRESSES, PAYMENT_METHODS } from "../config";
-import { api, humanDelay, pick, pickN, chance, randInt } from "../http";
+import { api, humanDelay, pick, pickN, chance, randInt, setClientProfile, randomClientProfile } from "../http";
 
 export async function checkoutJourney(): Promise<void> {
+  setClientProfile(randomClientProfile());
   const userIndex = Math.floor(Math.random() * USERS.length);
   const user = USERS[userIndex];
   const address = SHIPPING_ADDRESSES[userIndex];

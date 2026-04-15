@@ -27,9 +27,7 @@
       <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
         <!-- Logo -->
         <a href="/" class="flex items-center gap-2 shrink-0">
-          <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
-            <span class="text-white font-bold text-sm">CN</span>
-          </div>
+          <img src="/images/logo.svg" alt="CartNova" class="w-8 h-8" onerror="this.outerHTML='<div class=\\'w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center\\'><span class=\\'text-white font-bold text-sm\\'>CN</span></div>'">
           <span class="text-xl font-bold text-gray-900">CartNova</span>
         </a>
 

@@ -85,8 +85,11 @@
 
     grid.innerHTML = products.map((product, i) => `
       <a href="/product.html?id=${product.id}" class="product-card bg-white rounded-lg shadow-sm overflow-hidden block">
-        <div class="product-image-placeholder ${COLORS[i % COLORS.length]} h-40">
-          ${product.name}
+        <div class="product-image-container h-40">
+          ${product.image
+            ? `<img src="${product.image}" alt="${product.name}" class="product-image" loading="lazy"
+                onerror="this.parentElement.innerHTML='<div class=\\'product-image-placeholder ${COLORS[i % COLORS.length]} h-40\\'>${product.name}</div>'">`
+            : `<div class="product-image-placeholder ${COLORS[i % COLORS.length]} h-40">${product.name}</div>`}
         </div>
         <div class="p-3">
           <h3 class="text-sm font-semibold text-gray-900 line-clamp-2">${product.name}</h3>

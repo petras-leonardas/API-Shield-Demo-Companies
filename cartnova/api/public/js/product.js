@@ -51,12 +51,30 @@
       </div>`
     : "";
 
+  // Build image gallery HTML
+  const mainImage = product.images?.[0] || null;
+  const allImages = product.images || [];
+  const galleryHTML = mainImage
+    ? `<div>
+        <div class="product-gallery h-80">
+          <img id="main-product-image" src="${mainImage}" alt="${product.name}" class="rounded-lg"
+            onerror="this.parentElement.innerHTML='<div class=\\'product-image-placeholder ${COLORS[colorIdx]} rounded-lg h-80 text-xl\\'>${product.name}</div>'">
+        </div>
+        ${allImages.length > 1 ? `
+          <div class="product-thumbnails">
+            ${allImages.map((img, idx) => `
+              <img src="${img}" alt="${product.name} view ${idx + 1}" class="product-thumbnail ${idx === 0 ? 'active' : ''}"
+                onclick="document.getElementById('main-product-image').src='${img}'; document.querySelectorAll('.product-thumbnail').forEach(t=>t.classList.remove('active')); this.classList.add('active');"
+                onerror="this.style.display='none'">
+            `).join("")}
+          </div>` : ""}
+      </div>`
+    : `<div class="product-image-placeholder ${COLORS[colorIdx]} rounded-lg h-80 text-xl">${product.name}</div>`;
+
   document.getElementById("product-detail").innerHTML = `
     <div class="grid md:grid-cols-2 gap-8 w-full">
       <!-- Image -->
-      <div class="product-image-placeholder ${COLORS[colorIdx]} rounded-lg h-80 text-xl">
-        ${product.name}
-      </div>
+      ${galleryHTML}
 
       <!-- Info -->
       <div>

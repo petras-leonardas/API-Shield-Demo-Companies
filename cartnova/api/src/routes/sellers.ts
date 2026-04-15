@@ -24,6 +24,7 @@ app.get("/me/products", (c) => {
       in_stock: p.in_stock,
       rating: p.rating,
       review_count: p.review_count,
+      image: p.images[0] || null,
       created_at: p.created_at,
     })),
     total: sellerProducts.length,

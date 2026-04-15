@@ -14,6 +14,7 @@ app.get("/", (c) => {
       name: cat.name,
       slug: cat.slug,
       description: cat.description,
+      image: cat.image || null,
     })),
     total: categories.length,
   });
@@ -41,6 +42,7 @@ app.get("/:category_id/products", (c) => {
     category: {
       id: category.id,
       name: category.name,
+      image: category.image || null,
     },
     products: categoryProducts.map((p) => ({
       id: p.id,

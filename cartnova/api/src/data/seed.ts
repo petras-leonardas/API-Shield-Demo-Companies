@@ -114,6 +114,7 @@ export const categories: Category[] = [
     name: "Electronics",
     slug: "electronics",
     description: "Smartphones, laptops, audio, and more",
+    image: "/images/categories/electronics.jpg",
     parent_id: null,
   },
   {
@@ -121,6 +122,7 @@ export const categories: Category[] = [
     name: "Clothing & Fashion",
     slug: "clothing-fashion",
     description: "Apparel, shoes, and accessories",
+    image: "/images/categories/clothing.jpg",
     parent_id: null,
   },
   {
@@ -128,6 +130,7 @@ export const categories: Category[] = [
     name: "Home & Kitchen",
     slug: "home-kitchen",
     description: "Everything for your home",
+    image: "/images/categories/home-kitchen.jpg",
     parent_id: null,
   },
   {
@@ -135,6 +138,7 @@ export const categories: Category[] = [
     name: "Sports & Outdoors",
     slug: "sports-outdoors",
     description: "Fitness, camping, and outdoor gear",
+    image: "/images/categories/sports-outdoors.jpg",
     parent_id: null,
   },
   {
@@ -142,6 +146,7 @@ export const categories: Category[] = [
     name: "Books & Media",
     slug: "books-media",
     description: "Books, ebooks, and digital media",
+    image: "/images/categories/books-media.jpg",
     parent_id: null,
   },
 ];
@@ -160,8 +165,8 @@ export const products: Product[] = [
     category_id: "cat_elec",
     seller_id: "sel_tv0001",
     images: [
-      "https://cdn.cartnova.example.com/products/tv4k01_front.jpg",
-      "https://cdn.cartnova.example.com/products/tv4k01_side.jpg",
+      "/images/products/tv4k01_front.jpg",
+      "/images/products/tv4k01_side.jpg",
     ],
     rating: 4.6,
     review_count: 234,
@@ -178,8 +183,8 @@ export const products: Product[] = [
     category_id: "cat_elec",
     seller_id: "sel_tv0001",
     images: [
-      "https://cdn.cartnova.example.com/products/hp2401_open.jpg",
-      "https://cdn.cartnova.example.com/products/hp2401_closed.jpg",
+      "/images/products/hp2401_open.jpg",
+      "/images/products/hp2401_closed.jpg",
     ],
     rating: 4.8,
     review_count: 156,
@@ -196,8 +201,8 @@ export const products: Product[] = [
     category_id: "cat_elec",
     seller_id: "sel_tv0001",
     images: [
-      "https://cdn.cartnova.example.com/products/ear001_case.jpg",
-      "https://cdn.cartnova.example.com/products/ear001_buds.jpg",
+      "/images/products/ear001_case.jpg",
+      "/images/products/ear001_buds.jpg",
     ],
     rating: 4.4,
     review_count: 412,
@@ -214,8 +219,8 @@ export const products: Product[] = [
     category_id: "cat_clth",
     seller_id: "sel_nw0002",
     images: [
-      "https://cdn.cartnova.example.com/products/jkt001_front.jpg",
-      "https://cdn.cartnova.example.com/products/jkt001_back.jpg",
+      "/images/products/jkt001_front.jpg",
+      "/images/products/jkt001_back.jpg",
     ],
     rating: 4.7,
     review_count: 89,
@@ -232,8 +237,8 @@ export const products: Product[] = [
     category_id: "cat_clth",
     seller_id: "sel_nw0002",
     images: [
-      "https://cdn.cartnova.example.com/products/snk001_side.jpg",
-      "https://cdn.cartnova.example.com/products/snk001_top.jpg",
+      "/images/products/snk001_side.jpg",
+      "/images/products/snk001_top.jpg",
     ],
     rating: 4.3,
     review_count: 567,
@@ -250,7 +255,7 @@ export const products: Product[] = [
     category_id: "cat_clth",
     seller_id: "sel_nw0002",
     images: [
-      "https://cdn.cartnova.example.com/products/tsh001_front.jpg",
+      "/images/products/tsh001_front.jpg",
     ],
     rating: 4.5,
     review_count: 203,
@@ -267,7 +272,7 @@ export const products: Product[] = [
     category_id: "cat_home",
     seller_id: "sel_he0003",
     images: [
-      "https://cdn.cartnova.example.com/products/cfm001_kit.jpg",
+      "/images/products/cfm001_kit.jpg",
     ],
     rating: 4.9,
     review_count: 1024,
@@ -284,8 +289,8 @@ export const products: Product[] = [
     category_id: "cat_home",
     seller_id: "sel_he0003",
     images: [
-      "https://cdn.cartnova.example.com/products/knf001_blade.jpg",
-      "https://cdn.cartnova.example.com/products/knf001_handle.jpg",
+      "/images/products/knf001_blade.jpg",
+      "/images/products/knf001_handle.jpg",
     ],
     rating: 4.7,
     review_count: 321,
@@ -302,8 +307,8 @@ export const products: Product[] = [
     category_id: "cat_home",
     seller_id: "sel_he0003",
     images: [
-      "https://cdn.cartnova.example.com/products/lmp001_warm.jpg",
-      "https://cdn.cartnova.example.com/products/lmp001_cool.jpg",
+      "/images/products/lmp001_warm.jpg",
+      "/images/products/lmp001_cool.jpg",
     ],
     rating: 4.2,
     review_count: 178,
@@ -320,7 +325,7 @@ export const products: Product[] = [
     category_id: "cat_sprt",
     seller_id: "sel_he0003",
     images: [
-      "https://cdn.cartnova.example.com/products/yga001_rolled.jpg",
+      "/images/products/yga001_rolled.jpg",
     ],
     rating: 4.4,
     review_count: 445,
@@ -337,7 +342,7 @@ export const products: Product[] = [
     category_id: "cat_sprt",
     seller_id: "sel_he0003",
     images: [
-      "https://cdn.cartnova.example.com/products/bkp001_silver.jpg",
+      "/images/products/bkp001_silver.jpg",
     ],
     rating: 4.6,
     review_count: 289,
@@ -354,7 +359,7 @@ export const products: Product[] = [
     category_id: "cat_book",
     seller_id: "sel_tv0001",
     images: [
-      "https://cdn.cartnova.example.com/products/bk0001_cover.jpg",
+      "/images/products/bk0001_cover.jpg",
     ],
     rating: 4.5,
     review_count: 892,

@@ -27,8 +27,11 @@
         <div class="bg-white rounded-lg shadow-sm divide-y divide-gray-100">
           ${data.items.map((item) => `
             <div class="p-4 flex items-center gap-4" id="item-${item.id}">
-              <div class="flex-1">
-                <h3 class="font-semibold text-gray-900">${item.product_name}</h3>
+              ${item.image
+                ? `<img src="${item.image}" alt="${item.product_name}" class="w-16 h-16 rounded-lg object-cover shrink-0" onerror="this.style.display='none'">`
+                : `<div class="w-16 h-16 rounded-lg bg-gray-200 shrink-0 flex items-center justify-center"><span class="text-gray-400 text-xs text-center px-1">${item.product_name.substring(0, 10)}</span></div>`}
+              <div class="flex-1 min-w-0">
+                <h3 class="font-semibold text-gray-900 truncate">${item.product_name}</h3>
                 <p class="text-sm text-gray-500">&euro;${item.price.toFixed(2)} each</p>
               </div>
               <div class="flex items-center gap-2">
