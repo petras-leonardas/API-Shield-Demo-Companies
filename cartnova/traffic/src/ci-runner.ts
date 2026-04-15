@@ -71,7 +71,7 @@ async function coreBatch(): Promise<void> {
 
 async function expandedBatch(): Promise<void> {
   const expanded = pickRandom(EXPANDED_POOL, 6);
-  setClientProfile("browser");
+  setClientProfile("desktop");
   await wave(["exp-1", expanded[0]], ["exp-2", expanded[1]]);
   setClientProfile("mobile");
   await wave(["exp-3", expanded[2]], ["exp-4", expanded[3]]);
@@ -83,7 +83,7 @@ async function expandedBatch(): Promise<void> {
 }
 
 async function errorsBotsBatch(): Promise<void> {
-  setClientProfile("browser");
+  setClientProfile("desktop");
   await safe("errors", errorTrafficJourney);
   await safe("crawler", searchCrawlerJourney);
   await safe("scanner", scannerJourney);

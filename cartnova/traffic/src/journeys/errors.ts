@@ -13,7 +13,7 @@
 //   - Missing auth on protected endpoints (401)
 
 import { USERS, PRODUCT_IDS, CATEGORY_IDS } from "../config";
-import { api, burstDelay, pick, setClientProfile } from "../http";
+import { api, burstDelay, pick, setClientProfile, getOrLogin } from "../http";
 
 // A fake expired JWT (valid structure, expired timestamp)
 const EXPIRED_JWT =
@@ -27,7 +27,7 @@ const WRONG_KEY_JWT =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyX2hhY2tlciIsImVtYWlsIjoiaGFja2VyQGV2aWwuY29tIiwicm9sZSI6ImFkbWluIiwiaWF0IjoxNzc2MjAwMDAwLCJleHAiOjE3Nzk4MDAwMDAsImlzcyI6Im5vdC1jYXJ0bm92YSJ9.fakesignature";
 
 export async function errorTrafficJourney(): Promise<void> {
-  setClientProfile("browser");
+  setClientProfile("desktop");
 
   // ── Expired JWT (401) ───────────────────────────────────────────
   await api("GET", "/api/v2/cart", { token: EXPIRED_JWT });
@@ -68,18 +68,16 @@ export async function errorTrafficJourney(): Promise<void> {
   await burstDelay();
   // Add to cart without product_id
   const user = pick(USERS);
-  const login = await api<{ access_token: string }>("POST", "/api/v2/auth/login", {
-    body: { email: user.email, password: "test" },
-  });
-  if (login?.access_token) {
+  const validToken = await getOrLogin(user.email, user.password);
+  if (validToken) {
     await api("POST", "/api/v2/cart/items", {
-      token: login.access_token,
+      token: validToken,
       body: { quantity: 1 }, // missing product_id
     });
     await burstDelay();
     // Checkout shipping without required fields
     await api("PUT", "/api/v2/checkout/chk_fake123/shipping", {
-      token: login.access_token,
+      token: validToken,
       body: { name: "Test" }, // missing address, city, etc.
     });
     await burstDelay();

@@ -20,6 +20,7 @@ info:
     email: api@cartnova.example.com
   license:
     name: Proprietary
+    url: https://carnova.uk/terms
 
 servers:
   - url: https://carnova.uk
@@ -408,9 +409,11 @@ components:
         currency:
           type: string
         shipping:
+          type: object
           nullable: true
           description: Always null on start
         payment:
+          type: object
           nullable: true
           description: Always null on start
         status:
@@ -433,6 +436,7 @@ components:
         shipping:
           $ref: '#/components/schemas/ShippingInfo'
         payment:
+          type: object
           nullable: true
         updated_at:
           type: string
@@ -1060,6 +1064,7 @@ paths:
       description: Returns a paginated list of products. Supports filtering by search query and category.
       tags:
         - Products
+      security: []
       parameters:
         - name: q
           in: query
@@ -1109,6 +1114,7 @@ paths:
       description: Full-text search across product names and descriptions with optional price range filtering.
       tags:
         - Products
+      security: []
       parameters:
         - name: q
           in: query
@@ -1160,6 +1166,7 @@ paths:
       description: Returns full product information including description, all images, and variants.
       tags:
         - Products
+      security: []
       parameters:
         - name: product_id
           in: path
@@ -1187,6 +1194,7 @@ paths:
       description: Returns all reviews for a product along with the total count and average rating.
       tags:
         - Products
+      security: []
       parameters:
         - name: product_id
           in: path
@@ -1277,6 +1285,7 @@ paths:
       description: Returns all variants (size, color, etc.) for a product.
       tags:
         - Products
+      security: []
       parameters:
         - name: product_id
           in: path
@@ -1317,6 +1326,7 @@ paths:
       description: Returns all product categories.
       tags:
         - Categories
+      security: []
       responses:
         '200':
           description: Category listing
@@ -1339,6 +1349,7 @@ paths:
       description: Returns all products belonging to a specific category.
       tags:
         - Categories
+      security: []
       parameters:
         - name: category_id
           in: path
@@ -1728,6 +1739,7 @@ paths:
       description: Registers a new user account and returns a JWT access token.
       tags:
         - Auth
+      security: []
       requestBody:
         required: true
         content:
@@ -1776,6 +1788,7 @@ paths:
         Also sets a `refresh_token` HTTP-only cookie for token refresh.
       tags:
         - Auth
+      security: []
       requestBody:
         required: true
         content:
@@ -1821,6 +1834,7 @@ paths:
         The cookie is not modeled as a parameter in this spec since OpenAPI 3.0 does not support cookie-based auth well.
       tags:
         - Auth
+      security: []
       responses:
         '200':
           description: Token refreshed
@@ -2240,6 +2254,7 @@ paths:
         Authentication is handled via mTLS at the Cloudflare level, not in the application.
       tags:
         - Webhooks
+      security: []
       requestBody:
         required: true
         content:
@@ -2293,6 +2308,7 @@ paths:
         Authentication is handled via mTLS at the Cloudflare level, not in the application.
       tags:
         - Webhooks
+      security: []
       requestBody:
         required: true
         content:
@@ -2348,6 +2364,7 @@ paths:
         (should be flagged by Authentication Posture as missing auth).
       tags:
         - Internal
+      security: []
       responses:
         '200':
           description: Service health status
@@ -2365,6 +2382,7 @@ paths:
         **No authentication required.** Intentionally exposed — contains sensitive operational data.
       tags:
         - Internal
+      security: []
       responses:
         '200':
           description: Operational metrics
@@ -2382,6 +2400,7 @@ paths:
         **No authentication required.** Intentionally exposed — allows unauthenticated cache busting.
       tags:
         - Internal
+      security: []
       requestBody:
         required: false
         content:

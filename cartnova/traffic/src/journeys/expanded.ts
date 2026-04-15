@@ -18,7 +18,7 @@
 //   - Legacy system still running v1
 
 import { USERS, SELLERS } from "../config";
-import { api, humanDelay, pick, chance, randInt } from "../http";
+import { api, humanDelay, pick, chance, randInt, setClientProfile, getOrLogin } from "../http";
 
 // Mock IDs for generated resources
 function mockId(prefix: string): string {
@@ -28,12 +28,10 @@ function mockId(prefix: string): string {
 // ── Admin Backoffice Journey ────────────────────────────────────────
 
 export async function adminJourney(): Promise<void> {
+  setClientProfile("desktop");
   const user = pick(USERS);
-  const login = await api<{ access_token: string }>("POST", "/api/v2/auth/login", {
-    body: { email: user.email, password: user.password },
-  });
-  if (!login?.access_token) return;
-  const token = login.access_token;
+  const token = await getOrLogin(user.email, user.password);
+  if (!token) return;
 
   await humanDelay();
   await api("GET", "/api/v2/admin/users?page=1&per_page=20", { token });
@@ -69,11 +67,8 @@ export async function adminJourney(): Promise<void> {
 
 export async function inventoryJourney(): Promise<void> {
   const user = pick(USERS);
-  const login = await api<{ access_token: string }>("POST", "/api/v2/auth/login", {
-    body: { email: user.email, password: user.password },
-  });
-  if (!login?.access_token) return;
-  const token = login.access_token;
+  const token = await getOrLogin(user.email, user.password);
+  if (!token) return;
 
   await humanDelay();
   await api("GET", "/api/v2/inventory/stock-levels?page=1&per_page=20", { token });
@@ -101,11 +96,8 @@ export async function inventoryJourney(): Promise<void> {
 
 export async function marketingJourney(): Promise<void> {
   const user = pick(USERS);
-  const login = await api<{ access_token: string }>("POST", "/api/v2/auth/login", {
-    body: { email: user.email, password: user.password },
-  });
-  if (!login?.access_token) return;
-  const token = login.access_token;
+  const token = await getOrLogin(user.email, user.password);
+  if (!token) return;
 
   await humanDelay();
   await api("GET", "/api/v2/marketing/campaigns?page=1&per_page=20", { token });
@@ -139,11 +131,8 @@ export async function marketingJourney(): Promise<void> {
 
 export async function supportJourney(): Promise<void> {
   const user = pick(USERS);
-  const login = await api<{ access_token: string }>("POST", "/api/v2/auth/login", {
-    body: { email: user.email, password: user.password },
-  });
-  if (!login?.access_token) return;
-  const token = login.access_token;
+  const token = await getOrLogin(user.email, user.password);
+  if (!token) return;
 
   await humanDelay();
   await api("GET", "/api/v2/support/tickets?page=1&per_page=20", { token });
@@ -169,11 +158,8 @@ export async function supportJourney(): Promise<void> {
 
 export async function financeJourney(): Promise<void> {
   const user = pick(USERS);
-  const login = await api<{ access_token: string }>("POST", "/api/v2/auth/login", {
-    body: { email: user.email, password: user.password },
-  });
-  if (!login?.access_token) return;
-  const token = login.access_token;
+  const token = await getOrLogin(user.email, user.password);
+  if (!token) return;
 
   await humanDelay();
   await api("GET", "/api/v2/finance/transactions?page=1&per_page=20", { token });
@@ -201,11 +187,8 @@ export async function financeJourney(): Promise<void> {
 
 export async function logisticsJourney(): Promise<void> {
   const user = pick(USERS);
-  const login = await api<{ access_token: string }>("POST", "/api/v2/auth/login", {
-    body: { email: user.email, password: user.password },
-  });
-  if (!login?.access_token) return;
-  const token = login.access_token;
+  const token = await getOrLogin(user.email, user.password);
+  if (!token) return;
 
   await humanDelay();
   await api("GET", "/api/v2/logistics/shipments?page=1&per_page=20", { token });
@@ -232,11 +215,8 @@ export async function logisticsJourney(): Promise<void> {
 
 export async function analyticsJourney(): Promise<void> {
   const user = pick(USERS);
-  const login = await api<{ access_token: string }>("POST", "/api/v2/auth/login", {
-    body: { email: user.email, password: user.password },
-  });
-  if (!login?.access_token) return;
-  const token = login.access_token;
+  const token = await getOrLogin(user.email, user.password);
+  if (!token) return;
 
   await humanDelay();
   await api("GET", "/api/v2/analytics/dashboards", { token });
@@ -260,11 +240,8 @@ export async function analyticsJourney(): Promise<void> {
 
 export async function contentJourney(): Promise<void> {
   const user = pick(USERS);
-  const login = await api<{ access_token: string }>("POST", "/api/v2/auth/login", {
-    body: { email: user.email, password: user.password },
-  });
-  if (!login?.access_token) return;
-  const token = login.access_token;
+  const token = await getOrLogin(user.email, user.password);
+  if (!token) return;
 
   await humanDelay();
   await api("GET", "/api/v2/content/pages", { token });
@@ -319,11 +296,8 @@ export async function partnerJourney(): Promise<void> {
 
 export async function mobileJourney(): Promise<void> {
   const user = pick(USERS);
-  const login = await api<{ access_token: string }>("POST", "/api/v2/auth/login", {
-    body: { email: user.email, password: user.password },
-  });
-  if (!login?.access_token) return;
-  const token = login.access_token;
+  const token = await getOrLogin(user.email, user.password);
+  if (!token) return;
 
   await humanDelay();
   await api("GET", "/api/v2/mobile/config/get", { token });
@@ -347,11 +321,8 @@ export async function mobileJourney(): Promise<void> {
 
 export async function legacyJourney(): Promise<void> {
   const user = pick(USERS);
-  const login = await api<{ access_token: string }>("POST", "/api/v2/auth/login", {
-    body: { email: user.email, password: user.password },
-  });
-  if (!login?.access_token) return;
-  const token = login.access_token;
+  const token = await getOrLogin(user.email, user.password);
+  if (!token) return;
 
   // Legacy v1 commerce endpoints
   await humanDelay();

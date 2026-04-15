@@ -4,18 +4,14 @@
 // haven't upgraded, some use both, some try v3 (doesn't exist yet).
 
 import { USERS, PRODUCT_IDS, SELLERS, CATEGORY_IDS } from "../config";
-import { api, humanDelay, burstDelay, pick, setClientProfile, chance } from "../http";
+import { api, humanDelay, burstDelay, pick, setClientProfile, chance, getOrLogin } from "../http";
 
 /** Old mobile app still on v1 — hasn't been updated */
 export async function legacyMobileJourney(): Promise<void> {
   setClientProfile("mobile");
-
   const user = pick(USERS);
-  const login = await api<{ access_token: string }>("POST", "/api/v2/auth/login", {
-    body: { email: user.email, password: user.password },
-  });
-  if (!login?.access_token) return;
-  const token = login.access_token;
+  const token = await getOrLogin(user.email, user.password);
+  if (!token) return;
 
   // Old app uses v1 for everything
   await api("GET", "/api/v1/products", { token });
@@ -64,13 +60,9 @@ export async function mixedVersionJourney(): Promise<void> {
 /** Developer testing v3 (doesn't exist) — common when new version is rumored */
 export async function futureVersionJourney(): Promise<void> {
   setClientProfile("developer");
-
   const user = pick(USERS);
-  const login = await api<{ access_token: string }>("POST", "/api/v2/auth/login", {
-    body: { email: user.email, password: user.password },
-  });
-  if (!login?.access_token) return;
-  const token = login.access_token;
+  const token = await getOrLogin(user.email, user.password);
+  if (!token) return;
 
   // Try v3 endpoints (all will 404 but show up in discovery)
   await api("GET", "/api/v3/products", { token });

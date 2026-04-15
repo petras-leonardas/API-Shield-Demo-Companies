@@ -16,9 +16,11 @@
 //   POST /api/v2/products/:id/reviews
 
 import { USERS, USER_ORDERS, PRODUCT_IDS } from "../config";
-import { api, humanDelay, pick, chance, randInt } from "../http";
+import { api, humanDelay, pick, chance, randInt, setClientProfile, randomClientProfile, getOrLogin } from "../http";
 
 export async function userActivityJourney(): Promise<void> {
+  setClientProfile(randomClientProfile());
+
   // Variation: sometimes simulate a brand new user registering
   if (chance(0.1)) {
     await newUserRegistration();
@@ -28,12 +30,9 @@ export async function userActivityJourney(): Promise<void> {
   const userIndex = Math.floor(Math.random() * USERS.length);
   const user = USERS[userIndex];
 
-  // 1. Login
-  const loginResp = await api<{ access_token: string }>("POST", "/api/v2/auth/login", {
-    body: { email: user.email, password: user.password },
-  });
-  if (!loginResp?.access_token) return;
-  let token = loginResp.access_token;
+  // 1. Login (uses token cache)
+  const token = await getOrLogin(user.email, user.password);
+  if (!token) return;
 
   await humanDelay();
 

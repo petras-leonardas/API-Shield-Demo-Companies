@@ -1,53 +1,48 @@
 // Journey 2: Guest Browsing (Unauthenticated)
-// Simulates a visitor browsing the store without logging in.
-// Highest volume journey -- this is where most real traffic comes from.
-//
-// Endpoints covered:
-//   GET /api/v2/products/search?q=...
-//   GET /api/v2/categories
-//   GET /api/v2/categories/:id/products
-//   GET /api/v2/products/:id
-//   GET /api/v2/products/:id/reviews
-//   GET /api/v2/products/:id/variants
+// Simulates visitors browsing the store with varied query parameters,
+// sorting, filtering, and pagination patterns.
 
 import { PRODUCT_IDS, CATEGORY_IDS, SEARCH_TERMS } from "../config";
-import { api, humanDelay, pick, chance, randInt, setClientProfile, randomClientProfile } from "../http";
+import {
+  api, humanDelay, pick, chance, setClientProfile, randomClientProfile,
+  randomSort, randomPagination, randomFilters, randomSearchParams,
+} from "../http";
 
 /**
- * Search-first browsing: user searches, then drills into results.
+ * Search-first browsing with varied query parameters.
  */
 export async function searchBrowsingSession(): Promise<void> {
   const term = pick(SEARCH_TERMS);
 
-  // 1. Search for products
-  await api("GET", `/api/v2/products/search?q=${encodeURIComponent(term)}`);
-
+  // Search with varied params (sort, category filter, price range)
+  await api("GET", `/api/v2/products/search?${randomSearchParams(term)}`);
   await humanDelay();
 
-  // 2. Click into a product from results
   const productId = pick(PRODUCT_IDS);
   await api("GET", `/api/v2/products/${productId}`);
-
   await humanDelay();
 
-  // 3. Read reviews
   if (chance(0.7)) {
     await api("GET", `/api/v2/products/${productId}/reviews`);
     await humanDelay();
   }
 
-  // 4. Check variants / sizes
   if (chance(0.5)) {
     await api("GET", `/api/v2/products/${productId}/variants`);
     await humanDelay();
   }
 
-  // 5. Sometimes browse another product
+  // Sometimes refine search with different term
+  if (chance(0.3)) {
+    const newTerm = pick(SEARCH_TERMS);
+    await api("GET", `/api/v2/products/search?${randomSearchParams(newTerm)}`);
+    await humanDelay();
+  }
+
   if (chance(0.4)) {
     const secondProduct = pick(PRODUCT_IDS);
     await api("GET", `/api/v2/products/${secondProduct}`);
     await humanDelay();
-
     if (chance(0.5)) {
       await api("GET", `/api/v2/products/${secondProduct}/reviews`);
     }
@@ -55,27 +50,24 @@ export async function searchBrowsingSession(): Promise<void> {
 }
 
 /**
- * Category-first browsing: user explores categories, then products.
+ * Category-first browsing with filters and sorting.
  */
 export async function categoryBrowsingSession(): Promise<void> {
-  // 1. List all categories
   await api("GET", "/api/v2/categories");
-
   await humanDelay();
 
-  // 2. Pick a category and browse its products
   const categoryId = pick(CATEGORY_IDS);
-  await api("GET", `/api/v2/categories/${categoryId}/products`);
-
+  const filters = randomFilters();
+  const catUrl = filters
+    ? `/api/v2/categories/${categoryId}/products?${filters}`
+    : `/api/v2/categories/${categoryId}/products`;
+  await api("GET", catUrl);
   await humanDelay();
 
-  // 3. View a specific product from the category
   const productId = pick(PRODUCT_IDS);
   await api("GET", `/api/v2/products/${productId}`);
-
   await humanDelay();
 
-  // 4. Check reviews and/or variants
   if (chance(0.6)) {
     await api("GET", `/api/v2/products/${productId}/reviews`);
     await humanDelay();
@@ -86,44 +78,55 @@ export async function categoryBrowsingSession(): Promise<void> {
     await humanDelay();
   }
 
-  // 5. Sometimes explore a second category
+  // Re-sort or filter the same category
+  if (chance(0.4)) {
+    await api("GET", `/api/v2/categories/${categoryId}/products?${randomSort()}&${randomPagination()}`);
+    await humanDelay();
+  }
+
   if (chance(0.3)) {
     const secondCategory = pick(CATEGORY_IDS);
-    await api("GET", `/api/v2/categories/${secondCategory}/products`);
+    await api("GET", `/api/v2/categories/${secondCategory}/products?${randomPagination()}`);
     await humanDelay();
-
-    const secondProduct = pick(PRODUCT_IDS);
-    await api("GET", `/api/v2/products/${secondProduct}`);
+    await api("GET", `/api/v2/products/${pick(PRODUCT_IDS)}`);
   }
 }
 
 /**
- * Catalog browsing: user pages through the product list.
+ * Catalog browsing with varied pagination and sorting.
  */
 export async function catalogBrowsingSession(): Promise<void> {
-  // 1. First page of products
-  await api("GET", "/api/v2/products?page=1&limit=10");
+  // First page with random sort/filter
+  const filters = randomFilters();
+  const listUrl = filters
+    ? `/api/v2/products?${randomPagination()}&${filters}`
+    : `/api/v2/products?${randomPagination()}`;
+  await api("GET", listUrl);
   await humanDelay();
 
-  // 2. Sometimes page 2
+  // Page 2 with same or different sort
   if (chance(0.5)) {
-    await api("GET", "/api/v2/products?page=2&limit=10");
+    await api("GET", `/api/v2/products?${randomPagination()}&${randomSort()}`);
     await humanDelay();
   }
 
-  // 3. Click into a product
+  // Page 3 sometimes
+  if (chance(0.3)) {
+    await api("GET", `/api/v2/products?page=3&limit=12&${randomSort()}`);
+    await humanDelay();
+  }
+
   const productId = pick(PRODUCT_IDS);
   await api("GET", `/api/v2/products/${productId}`);
   await humanDelay();
 
-  // 4. Reviews
   if (chance(0.6)) {
     await api("GET", `/api/v2/products/${productId}/reviews`);
   }
 }
 
 /**
- * Run a random browsing session (picks one of three patterns).
+ * Run a random browsing session.
  */
 export async function browsingJourney(): Promise<void> {
   setClientProfile(randomClientProfile());

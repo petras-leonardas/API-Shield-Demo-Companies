@@ -3,17 +3,13 @@
 // POST /api/v2/graphql with varied operations and variables.
 
 import { USERS, PRODUCT_IDS } from "../config";
-import { api, humanDelay, burstDelay, pick, setClientProfile } from "../http";
+import { api, humanDelay, burstDelay, pick, setClientProfile, getOrLogin } from "../http";
 
 export async function graphqlJourney(): Promise<void> {
-  // Login first (GraphQL requires JWT)
-  setClientProfile("browser");
+  setClientProfile("desktop");
   const user = pick(USERS);
-  const login = await api<{ access_token: string }>("POST", "/api/v2/auth/login", {
-    body: { email: user.email, password: user.password },
-  });
-  if (!login?.access_token) return;
-  const token = login.access_token;
+  const token = await getOrLogin(user.email, user.password);
+  if (!token) return;
 
   // Introspection (public)
   await api("GET", "/api/v2/graphql");
@@ -154,11 +150,8 @@ export async function graphqlJourney(): Promise<void> {
 export async function mobileGraphqlJourney(): Promise<void> {
   setClientProfile("mobile");
   const user = pick(USERS);
-  const login = await api<{ access_token: string }>("POST", "/api/v2/auth/login", {
-    body: { email: user.email, password: user.password },
-  });
-  if (!login?.access_token) return;
-  const token = login.access_token;
+  const token = await getOrLogin(user.email, user.password);
+  if (!token) return;
 
   // Mobile home screen: products + categories in one query
   await api("POST", "/api/v2/graphql", {

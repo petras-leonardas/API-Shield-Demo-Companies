@@ -18,7 +18,7 @@
 //   GET  /api/v2/checkout/:id/status
 
 import { USERS, PRODUCT_IDS, SHIPPING_ADDRESSES, PAYMENT_METHODS } from "../config";
-import { api, humanDelay, pick, pickN, chance, randInt, setClientProfile, randomClientProfile } from "../http";
+import { api, humanDelay, pick, pickN, chance, randInt, setClientProfile, randomClientProfile, getOrLogin } from "../http";
 
 export async function checkoutJourney(): Promise<void> {
   setClientProfile(randomClientProfile());
@@ -26,12 +26,9 @@ export async function checkoutJourney(): Promise<void> {
   const user = USERS[userIndex];
   const address = SHIPPING_ADDRESSES[userIndex];
 
-  // 1. Login
-  const loginResp = await api<{ access_token: string }>("POST", "/api/v2/auth/login", {
-    body: { email: user.email, password: user.password },
-  });
-  if (!loginResp?.access_token) return;
-  const token = loginResp.access_token;
+  // 1. Login (uses token cache to reduce login endpoint dominance)
+  const token = await getOrLogin(user.email, user.password);
+  if (!token) return;
 
   await humanDelay();
 
