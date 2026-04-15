@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CartNova — Cart</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <main class="max-w-3xl mx-auto px-4 py-6">
+    <h1 class="text-2xl font-bold text-gray-900 mb-6">Shopping Cart</h1>
+
+    <div id="cart-content" class="flex justify-center py-12">
+      <div class="spinner"></div>
+    </div>
+  </main>
+
+  <footer class="max-w-3xl mx-auto px-4 pb-8 mt-8">
+    <details class="api-panel bg-gray-900 text-green-400 rounded-lg p-4">
+      <summary class="text-gray-400 hover:text-green-400 transition-colors">API Endpoints used on this page</summary>
+      <div class="mt-3 space-y-1">
+        <div>GET /api/v2/cart <span class="text-gray-500">— load cart</span></div>
+        <div>PUT /api/v2/cart/items/{item_id} <span class="text-gray-500">— update quantity</span></div>
+        <div>DELETE /api/v2/cart/items/{item_id} <span class="text-gray-500">— remove item</span></div>
+        <div>POST /api/v2/checkout/start <span class="text-gray-500">— initiate checkout</span></div>
+      </div>
+    </details>
+  </footer>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/nav.js"></script>
+  <script src="/js/cart.js"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+name = "cartnova-traffic"
+main = "src/index.ts"
+compatibility_date = "2025-04-01"
+account_id = "0644b2da0e70bd12883572fd98db4874"
+
+[triggers]
+crons = ["* * * * *"]

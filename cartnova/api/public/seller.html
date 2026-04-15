@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CartNova — Seller Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <main class="max-w-5xl mx-auto px-4 py-6">
+    <h1 class="text-2xl font-bold text-gray-900 mb-6">Seller Portal</h1>
+
+    <!-- API Key connect bar -->
+    <div id="connect-bar" class="bg-white rounded-lg shadow-sm p-4 mb-6">
+      <div class="flex items-center gap-3">
+        <div class="flex-1">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Seller API Key</label>
+          <select id="api-key-select" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            <option value="">Select a test seller...</option>
+            <option value="sk_tv_live_a1b2c3d4e5f6">TechVault — sk_tv_live_a1b2c3d4e5f6</option>
+            <option value="sk_nw_live_g7h8i9j0k1l2">NordicWear — sk_nw_live_g7h8i9j0k1l2</option>
+            <option value="sk_he_live_m3n4o5p6q7r8">HomeEssence — sk_he_live_m3n4o5p6q7r8</option>
+          </select>
+        </div>
+        <button onclick="connectSeller()" id="connect-btn"
+          class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-indigo-700 transition-colors mt-6">
+          Connect
+        </button>
+      </div>
+    </div>
+
+    <!-- Dashboard (hidden until connected) -->
+    <div id="dashboard" class="hidden space-y-6">
+
+      <!-- Seller info bar -->
+      <div class="flex items-center justify-between bg-indigo-50 rounded-lg px-4 py-3">
+        <div>
+          <span class="text-sm text-indigo-600 font-medium">Connected as:</span>
+          <span id="seller-name" class="font-semibold text-indigo-900 ml-1"></span>
+        </div>
+        <button onclick="disconnectSeller()" class="text-sm text-gray-500 hover:text-red-600">Disconnect</button>
+      </div>
+
+      <!-- Analytics -->
+      <div class="bg-white rounded-lg shadow-sm p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Sales Analytics</h2>
+        <div id="analytics-content" class="grid grid-cols-3 gap-4">
+          <div class="flex justify-center py-4 col-span-3"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- Products -->
+      <div class="bg-white rounded-lg shadow-sm p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-gray-900">My Products</h2>
+          <button onclick="toggleAddForm()" id="add-product-toggle" class="text-sm bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition-colors">+ Add Product</button>
+        </div>
+
+        <!-- Add product form -->
+        <form id="add-form" class="hidden bg-gray-50 rounded-lg p-4 mb-4 space-y-3" onsubmit="addProduct(event)">
+          <div class="grid grid-cols-3 gap-3">
+            <div class="col-span-2">
+              <label class="block text-xs font-medium text-gray-700 mb-1">Product Name</label>
+              <input type="text" id="new-name" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">Price (EUR)</label>
+              <input type="number" id="new-price" step="0.01" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">Category</label>
+            <select id="new-category" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+              <option value="cat_elec">Electronics</option>
+              <option value="cat_clth">Clothing & Fashion</option>
+              <option value="cat_home">Home & Kitchen</option>
+              <option value="cat_sprt">Sports & Outdoors</option>
+              <option value="cat_book">Books & Media</option>
+            </select>
+          </div>
+          <button type="submit" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700">Create Listing</button>
+        </form>
+
+        <div id="products-list" class="space-y-2"></div>
+      </div>
+
+      <!-- Orders -->
+      <div class="bg-white rounded-lg shadow-sm p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Recent Orders</h2>
+        <div id="seller-orders"></div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="max-w-5xl mx-auto px-4 pb-8 mt-8">
+    <details class="api-panel bg-gray-900 text-green-400 rounded-lg p-4">
+      <summary class="text-gray-400 hover:text-green-400 transition-colors">API Endpoints used on this page</summary>
+      <div class="mt-3 space-y-1">
+        <div class="text-gray-500 mb-2">All endpoints use X-Seller-Key header authentication (not JWT)</div>
+        <div>GET /api/v2/sellers/me/products <span class="text-gray-500">— product listings</span></div>
+        <div>POST /api/v2/sellers/me/products <span class="text-gray-500">— create listing</span></div>
+        <div>PUT /api/v2/sellers/me/products/{id} <span class="text-gray-500">— update listing</span></div>
+        <div>GET /api/v2/sellers/me/analytics <span class="text-gray-500">— sales dashboard</span></div>
+        <div>GET /api/v2/sellers/me/orders <span class="text-gray-500">— orders for my products</span></div>
+      </div>
+    </details>
+  </footer>
+
+  <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/nav.js"></script>
+  <script src="/js/seller.js"></script>
+</body>
+</html>

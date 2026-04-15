@@ -1,0 +1,31 @@
+name: CartNova Traffic Generator
+
+on:
+  schedule:
+    # Run every 5 minutes (GitHub Actions minimum cron interval)
+    - cron: "*/5 * * * *"
+  workflow_dispatch: # Allow manual trigger from GitHub UI
+
+jobs:
+  generate-traffic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        working-directory: cartnova/traffic
+        run: npm install
+
+      - name: Run traffic generator (4 minutes)
+        working-directory: cartnova/traffic
+        env:
+          DURATION_MINUTES: "4"
+        run: npx tsx src/ci-runner.ts
