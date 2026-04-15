@@ -1,125 +1,121 @@
-// CartNova Traffic Generator -- Cron Worker
+// CartNova Traffic Scheduler -- Cron Worker
 //
-// Runs every minute via Cron trigger. Generates traffic across CartNova's
-// full API surface through Cloudflare's proxy so API Shield discovers
-// all endpoints.
+// Triggers the GitHub Actions traffic generator workflow every 5 minutes.
+// The actual traffic generation runs on GitHub's infrastructure (outside
+// Cloudflare's network) so requests pass through the full security
+// proxy pipeline and appear in API Shield / Security Analytics.
 //
-// DESIGN: Fully sequential execution (one journey at a time) to avoid
-// Cloudflare Workers' edge-to-same-zone connection limits. This trades
-// concurrency for reliability — every request must succeed.
+// Why not generate traffic directly from this Worker?
+//   Worker-to-same-zone subrequests bypass the security pipeline.
+//   Traffic from inside Cloudflare's network (Workers, WARP) is routed
+//   internally and never reaches Security Analytics or API Shield.
 
-import { checkoutJourney } from "./journeys/checkout";
-import { browsingJourney } from "./journeys/browsing";
-import { sellerJourney } from "./journeys/seller";
-import { userActivityJourney } from "./journeys/user-activity";
-import {
-  adminJourney,
-  inventoryJourney,
-  marketingJourney,
-  supportJourney,
-  financeJourney,
-  logisticsJourney,
-  analyticsJourney,
-  contentJourney,
-  partnerJourney,
-  mobileJourney,
-  legacyJourney,
-  internalOpsJourney,
-} from "./journeys/expanded";
-import { api, getResults, type RequestResult } from "./http";
-import { BASE_URL } from "./config";
+interface Env {
+  GITHUB_TOKEN: string;
+}
 
-const EXPANDED_POOL = [
-  adminJourney, inventoryJourney, marketingJourney, supportJourney,
-  financeJourney, logisticsJourney, analyticsJourney, contentJourney,
-  partnerJourney, mobileJourney, legacyJourney, internalOpsJourney,
-];
+const GITHUB_REPO = "petras-leonardas/API-Shield-Demo-Companies";
+const WORKFLOW_FILE = "traffic.yml";
 
 export default {
-  async scheduled(event: ScheduledEvent, env: unknown, ctx: ExecutionContext): Promise<void> {
-    ctx.waitUntil(runTrafficBatch().then(() => {}));
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(triggerGitHubWorkflow(env));
   },
 
-  async fetch(request: Request): Promise<Response> {
+  async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    if (url.pathname === "/run" && request.method === "POST") {
-      const start = Date.now();
-      const results = await runTrafficBatch();
-      const duration = Date.now() - start;
+    // POST /trigger -- manually trigger the GitHub workflow
+    if (url.pathname === "/trigger" && request.method === "POST") {
+      const result = await triggerGitHubWorkflow(env);
+      return Response.json(result);
+    }
 
-      return Response.json({
-        status: "completed",
-        duration_ms: duration,
-        requests_made: results.length,
-        succeeded: results.filter((r) => r.ok).length,
-        failed: results.filter((r) => !r.ok).length,
-        results,
-      });
+    // GET /status -- check recent workflow runs
+    if (url.pathname === "/status") {
+      const result = await getWorkflowStatus(env);
+      return Response.json(result);
     }
 
     return Response.json({
-      name: "CartNova Traffic Generator",
-      target: BASE_URL,
-      approach: "Fully sequential (1 journey at a time) for reliable edge-to-edge delivery",
-      cron: "* * * * *",
+      name: "CartNova Traffic Scheduler",
+      description: "Triggers GitHub Actions workflow for external traffic generation",
+      repo: GITHUB_REPO,
+      workflow: WORKFLOW_FILE,
+      cron: "*/5 * * * *",
+      endpoints: {
+        "POST /trigger": "Manually trigger the traffic workflow",
+        "GET /status": "Check recent workflow runs",
+        "GET /": "This status page",
+      },
     });
   },
 };
 
-// ── Helpers ───────────────────────────────────────────────────────
+async function triggerGitHubWorkflow(env: Env): Promise<{ ok: boolean; message: string }> {
+  if (!env.GITHUB_TOKEN) {
+    console.error("[trigger] GITHUB_TOKEN secret not set");
+    return { ok: false, message: "GITHUB_TOKEN secret not configured" };
+  }
 
-function pickRandom<T>(arr: T[], n: number): T[] {
-  const shuffled = [...arr].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, Math.min(n, arr.length));
-}
-
-async function safe(name: string, fn: () => Promise<void>): Promise<void> {
   try {
-    await fn();
-  } catch (e) {
-    console.error(`[${name}] failed:`, e);
+    const resp = await fetch(
+      `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${WORKFLOW_FILE}/dispatches`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+          Accept: "application/vnd.github.v3+json",
+          "User-Agent": "cartnova-traffic-scheduler",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ ref: "main" }),
+      }
+    );
+
+    if (resp.status === 204) {
+      console.log("[trigger] GitHub workflow dispatched successfully");
+      return { ok: true, message: "Workflow dispatched" };
+    }
+
+    const body = await resp.text();
+    console.error(`[trigger] GitHub API returned ${resp.status}: ${body}`);
+    return { ok: false, message: `GitHub API ${resp.status}: ${body}` };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[trigger] Failed: ${msg}`);
+    return { ok: false, message: msg };
   }
 }
 
-/**
- * Run one traffic batch. Called every minute by Cron.
- *
- * Fully sequential: one journey finishes before the next starts.
- * With reduced delays (100-400ms between requests), each journey
- * takes ~1-3 seconds. 15-18 journeys fit comfortably in 60 seconds.
- */
-async function runTrafficBatch(): Promise<RequestResult[]> {
-
-  // Core commerce journeys (sequential)
-  await safe("browse-1", browsingJourney);
-  await safe("checkout-1", checkoutJourney);
-  await safe("browse-2", browsingJourney);
-  await safe("checkout-2", checkoutJourney);
-  await safe("browse-3", browsingJourney);
-  await safe("user-1", userActivityJourney);
-  await safe("browse-4", browsingJourney);
-  await safe("checkout-3", checkoutJourney);
-  await safe("seller-1", sellerJourney);
-  await safe("browse-5", browsingJourney);
-  await safe("checkout-4", checkoutJourney);
-  await safe("user-2", userActivityJourney);
-
-  // Expanded domains (pick 3 random)
-  const expanded = pickRandom(EXPANDED_POOL, 3);
-  for (const fn of expanded) {
-    await safe("expanded", fn);
+async function getWorkflowStatus(env: Env): Promise<unknown> {
+  if (!env.GITHUB_TOKEN) {
+    return { error: "GITHUB_TOKEN secret not configured" };
   }
 
-  // Monitoring
-  await safe("monitoring", async () => {
-    await api("GET", "/internal/health");
-    await api("GET", "/internal/metrics");
-  });
+  try {
+    const resp = await fetch(
+      `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${WORKFLOW_FILE}/runs?per_page=5`,
+      {
+        headers: {
+          Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+          Accept: "application/vnd.github.v3+json",
+          "User-Agent": "cartnova-traffic-scheduler",
+        },
+      }
+    );
 
-  const results = getResults();
-  const succeeded = results.filter((r) => r.ok).length;
-  const failed = results.length - succeeded;
-  console.log(`[batch] ${results.length} requests (${succeeded} ok, ${failed} failed)`);
-  return results;
+    const data = await resp.json() as any;
+    return {
+      recent_runs: (data.workflow_runs || []).map((run: any) => ({
+        id: run.id,
+        status: run.status,
+        conclusion: run.conclusion,
+        started: run.created_at,
+        url: run.html_url,
+      })),
+    };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 }

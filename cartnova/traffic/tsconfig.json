@@ -11,5 +11,6 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/ci-runner.ts", "src/local-runner.ts"]
 }
