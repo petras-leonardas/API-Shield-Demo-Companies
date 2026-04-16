@@ -131,6 +131,30 @@ API-Shield-Demo-Companies/
 
 Cloudflare account ID: `0644b2da0e70bd12883572fd98db4874`
 
+## Traffic Kill Switch
+
+The traffic generator has a kill switch to pause/resume all automated traffic. This exists because the personal Cloudflare account ("Leo Designs the World") is on the free Workers plan with a 100,000 requests/day limit, and the traffic generator can produce 100K+ requests/day.
+
+**Current state: PAUSED (TRAFFIC_ENABLED = false)**
+
+**The switch:** A single constant `TRAFFIC_ENABLED` in `cartnova/traffic/src/config.ts` (line 7).
+
+**To pause traffic (stop all requests):**
+1. Set `TRAFFIC_ENABLED = false` in `cartnova/traffic/src/config.ts`
+2. Push to `main` (so GitHub Actions CI runner picks up the change)
+3. Redeploy the traffic Worker: `npx wrangler deploy` from `cartnova/traffic/`
+
+**To resume traffic (re-enable all requests):**
+1. Set `TRAFFIC_ENABLED = true` in `cartnova/traffic/src/config.ts`
+2. Push to `main`
+3. Redeploy the traffic Worker: `npx wrangler deploy` from `cartnova/traffic/`
+
+**How it works:** The switch is checked in two places:
+- `cartnova/traffic/src/index.ts` -- the Worker cron handler exits early without triggering GitHub Actions
+- `cartnova/traffic/src/ci-runner.ts` -- the GitHub Actions entry point exits immediately if a run somehow starts
+
+**When the user says "turn on traffic" or "resume traffic":** Change `TRAFFIC_ENABLED` to `true`, push, and redeploy. When they say "turn off traffic" or "pause traffic": change to `false`, push, and redeploy.
+
 ## Key Credentials for Testing
 
 **Buyer accounts** (any password works on the mock API):

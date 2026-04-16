@@ -12,5 +12,5 @@
     "forceConsistentCasingInFileNames": true
   },
   "include": ["src"],
-  "exclude": ["src/ci-runner.ts", "src/local-runner.ts"]
+  "exclude": ["src/ci-runner.ts", "src/local-runner.ts", "src/journeys/attacks.ts"]
 }

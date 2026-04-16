@@ -95,3 +95,23 @@ jobs:
           JOB_TYPE: special
           DURATION_MINUTES: "9"
         run: npx tsx src/ci-runner.ts
+
+  # Job 6: API Shield attack patterns (5a-5f)
+  # Rate limit abuse, sequence violations, BOLA, JWT attacks,
+  # enumeration, shadow API probing
+  attack-traffic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install
+        working-directory: cartnova/traffic
+      - name: Generate attack traffic patterns
+        working-directory: cartnova/traffic
+        env:
+          JOB_TYPE: attacks
+          DURATION_MINUTES: "9"
+        run: npx tsx src/ci-runner.ts

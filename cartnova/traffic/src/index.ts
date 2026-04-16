@@ -10,6 +10,8 @@
 //   Traffic from inside Cloudflare's network (Workers, WARP) is routed
 //   internally and never reaches Security Analytics or API Shield.
 
+import { TRAFFIC_ENABLED } from "./config";
+
 interface Env {
   GITHUB_TOKEN: string;
 }
@@ -19,6 +21,10 @@ const WORKFLOW_FILE = "traffic.yml";
 
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+    if (!TRAFFIC_ENABLED) {
+      console.log("[scheduler] Traffic paused via kill switch (TRAFFIC_ENABLED = false in config.ts)");
+      return;
+    }
     ctx.waitUntil(triggerGitHubWorkflow(env));
   },
 

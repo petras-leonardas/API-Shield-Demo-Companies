@@ -1,6 +1,12 @@
 // CartNova Traffic Generator -- Configuration
 // All seed data constants needed to drive realistic traffic
 
+// ── Traffic Kill Switch ─────────────────────────────────────────────
+// Set to false to pause ALL automated traffic generation.
+// Set back to true and redeploy to resume.
+// Why: Free Workers plan has 100K requests/day limit on the personal account.
+export const TRAFFIC_ENABLED = false;
+
 export const BASE_URL = "https://carnova.uk";
 
 // ── Users (any password works on the mock API) ──────────────────────

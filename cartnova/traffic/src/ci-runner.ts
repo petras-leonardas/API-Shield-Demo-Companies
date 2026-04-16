@@ -10,6 +10,9 @@
 //   errors-bots — error traffic, crawlers, scanners, scrapers
 //   graphql     — GraphQL queries and mutations
 //   special     — rate limiting, versioning drift, mixed patterns
+//   attacks     — API Shield attack patterns (5a-5f): rate limit abuse,
+//                 sequence violations, BOLA, JWT attacks, enumeration,
+//                 shadow API probing
 
 import { checkoutJourney } from "./journeys/checkout";
 import { browsingJourney } from "./journeys/browsing";
@@ -26,7 +29,13 @@ import { webhookJourney } from "./journeys/webhooks";
 import { graphqlJourney, mobileGraphqlJourney } from "./journeys/graphql";
 import { rateLimitJourney } from "./journeys/rate-limit";
 import { legacyMobileJourney, mixedVersionJourney, futureVersionJourney } from "./journeys/versioning";
+import {
+  allAttacks, attackRateLimitAbuse, attackSequenceSkipToConfirm,
+  attackCrossUserCheckout, attackJwtAttacks, attackBolaEnumeration,
+  attackShadowApiProbing,
+} from "./journeys/attacks";
 import { api, getResults, setClientProfile, randomClientProfile } from "./http";
+import { TRAFFIC_ENABLED } from "./config";
 
 const DURATION_MS = (parseInt(process.env.DURATION_MINUTES || "4") || 4) * 60 * 1000;
 const JOB_TYPE = process.env.JOB_TYPE || "core";
@@ -119,6 +128,22 @@ async function specialBatch(): Promise<void> {
   await wave(["browse-1", browsingJourney], ["browse-2", browsingJourney]);
 }
 
+async function attacksBatch(): Promise<void> {
+  // Run all 6 attack patterns per batch. Each pattern targets a
+  // specific API Shield feature. Interleave with legitimate traffic
+  // so the contrast between normal and malicious is visible in analytics.
+  await safe("5a-rate-abuse", attackRateLimitAbuse);
+  await safe("5b-seq-skip", attackSequenceSkipToConfirm);
+  await safe("5c-cross-user", attackCrossUserCheckout);
+  await safe("5d-jwt-attacks", attackJwtAttacks);
+  await safe("5e-bola-enum", attackBolaEnumeration);
+  await safe("5f-shadow-api", attackShadowApiProbing);
+
+  // Interleave some legitimate traffic for contrast
+  setClientProfile(randomClientProfile());
+  await wave(["legit-browse", browsingJourney], ["legit-checkout", checkoutJourney]);
+}
+
 // ── Main Loop ───────────────────────────────────────────────────────
 
 const BATCH_FNS: Record<string, () => Promise<void>> = {
@@ -127,9 +152,15 @@ const BATCH_FNS: Record<string, () => Promise<void>> = {
   "errors-bots": errorsBotsBatch,
   graphql: graphqlBatch,
   special: specialBatch,
+  attacks: attacksBatch,
 };
 
 async function main() {
+  if (!TRAFFIC_ENABLED) {
+    console.log("Traffic paused via kill switch (TRAFFIC_ENABLED = false in config.ts). Exiting.");
+    process.exit(0);
+  }
+
   const batchFn = BATCH_FNS[JOB_TYPE] || coreBatch;
   const deadline = Date.now() + DURATION_MS;
   let batchNum = 0;
