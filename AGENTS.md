@@ -135,7 +135,7 @@ Cloudflare account ID: `0644b2da0e70bd12883572fd98db4874`
 
 The traffic generator has a kill switch to pause/resume all automated traffic. This exists because the personal Cloudflare account ("Leo Designs the World") is on the free Workers plan with a 100,000 requests/day limit, and the traffic generator can produce 100K+ requests/day.
 
-**Current state: ACTIVE (TRAFFIC_ENABLED = true)**
+**Current state: PAUSED (TRAFFIC_ENABLED = false)**
 
 **The switch:** A single constant `TRAFFIC_ENABLED` in `cartnova/traffic/src/config.ts` (line 7).
 
