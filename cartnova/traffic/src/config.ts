@@ -5,7 +5,7 @@
 // Set to false to pause ALL automated traffic generation.
 // Set back to true and redeploy to resume.
 // Why: Free Workers plan has 100K requests/day limit on the personal account.
-export const TRAFFIC_ENABLED = false;
+export const TRAFFIC_ENABLED = true;
 
 export const BASE_URL = "https://carnova.uk";
 
