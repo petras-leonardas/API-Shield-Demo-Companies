@@ -61,10 +61,13 @@ function makeToken(overrides: Record<string, unknown> = {}): string {
 
 export async function attackRateLimitAbuse(): Promise<void> {
   setClientProfile("integration");
-  console.log("    [5a] Rate limit abuse: 100 rapid search requests");
+  // Reduced from 100 → 30 requests to fit the daily request budget.
+  // Still bursty enough to trigger rate-limit rules (which typically
+  // threshold at 10-20 req/s).
+  console.log("    [5a] Rate limit abuse: 30 rapid search requests");
 
   const term = pick(SEARCH_TERMS);
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 30; i++) {
     // Fire without awaiting response sequentially but with minimal delay
     await api("GET", `/api/v2/products/search?q=${encodeURIComponent(term)}`);
     await burstDelay(); // 5-25ms between requests
@@ -167,11 +170,12 @@ export async function attackJwtAttacks(): Promise<void> {
   setClientProfile("integration");
   console.log("    [5d] JWT attacks: expired, tampered, wrong-issuer, wrong-key");
 
+  // Reduced endpoint list from 4 → 2 per attack variant to fit budget.
+  // Each attack type (expired, wrong-issuer, wrong-key, tampered) still
+  // hits multiple endpoints, just fewer per run.
   const endpoints = [
     "/api/v2/cart",
-    "/api/v2/orders",
     "/api/v2/users/me",
-    "/api/v2/checkout/start",
   ];
 
   // Attack 1: Expired token (expired 1 hour ago)
@@ -255,6 +259,10 @@ export async function attackJwtAttacks(): Promise<void> {
 
 export async function attackBolaEnumeration(): Promise<void> {
   setClientProfile("integration");
+  // Reduced enumeration ranges to fit the daily request budget.
+  // Previous: 60 order attempts + 15 tracking + 15 checkout = 90 requests.
+  // New: 18 order attempts + 6 tracking + 5 checkout = 29 requests.
+  // Still clearly enumeration-shaped traffic that API Shield should flag.
   console.log("    [5e] BOLA enumeration: sequential order ID iteration");
 
   // Login as User C (Sofia) — only has 1 order
@@ -267,13 +275,13 @@ export async function attackBolaEnumeration(): Promise<void> {
   // Enumerate order IDs trying to find other users' orders
   const prefixes = ["ord_em", "ord_lc", "ord_sm"];
   for (const prefix of prefixes) {
-    for (let i = 1; i <= 20; i++) {
+    for (let i = 1; i <= 6; i++) {
       const orderId = `${prefix}${String(i).padStart(4, "0")}`;
       await api("GET", `/api/v2/orders/${orderId}`, { token });
       await burstDelay();
 
       // Also try tracking endpoint
-      if (i <= 5) {
+      if (i <= 2) {
         await api("GET", `/api/v2/orders/${orderId}/tracking`, { token });
         await burstDelay();
       }
@@ -281,7 +289,7 @@ export async function attackBolaEnumeration(): Promise<void> {
   }
 
   // Also enumerate checkout IDs
-  for (let i = 1; i <= 15; i++) {
+  for (let i = 1; i <= 5; i++) {
     const checkoutId = `chk_${String(i).padStart(4, "0")}`;
     await api("GET", `/api/v2/checkout/${checkoutId}/status`, { token });
     await burstDelay();
@@ -316,8 +324,10 @@ export async function attackShadowApiProbing(): Promise<void> {
   });
   await burstDelay();
 
-  // Probe for common internal/debug paths that might exist
-  const probePaths = [
+  // Probe for common internal/debug paths that might exist.
+  // Reduced from 15 → ~5 probe paths per run. A rotating subset keeps
+  // the probing pattern visible over time without burning budget.
+  const allProbePaths = [
     "/internal/debug",
     "/internal/config",
     "/internal/env",
@@ -334,6 +344,8 @@ export async function attackShadowApiProbing(): Promise<void> {
     "/healthz",
     "/readyz",
   ];
+  // Pick 5 random probes per run (shuffle + slice)
+  const probePaths = [...allProbePaths].sort(() => Math.random() - 0.5).slice(0, 5);
 
   for (const path of probePaths) {
     await api("GET", path);

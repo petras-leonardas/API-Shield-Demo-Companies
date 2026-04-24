@@ -48,7 +48,7 @@ export default {
       description: "Triggers GitHub Actions workflow for external traffic generation",
       repo: GITHUB_REPO,
       workflow: WORKFLOW_FILE,
-      cron: "*/5 * * * *",
+      cron: "0 */2 * * *",
       endpoints: {
         "POST /trigger": "Manually trigger the traffic workflow",
         "GET /status": "Check recent workflow runs",

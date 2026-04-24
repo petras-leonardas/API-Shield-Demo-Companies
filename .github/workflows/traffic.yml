@@ -1,15 +1,28 @@
 name: CartNova Traffic Generator
 
+# Schedule: every 2 hours = 12 runs/day.
+# Tuned for the free Workers plan (100K req/day limit on carnova.uk).
+# Target: ~15-20K requests/day (20% of the free tier).
+#
+# Job rotation (enforced inside ci-runner.ts):
+#   core-traffic + attack-traffic     → every scheduled run (12×/day)
+#   expanded-traffic                  → hours {0, 8, 16} UTC (3×/day)
+#   graphql-traffic                   → hours {2, 10, 18} UTC (3×/day)
+#   errors-bots-traffic               → hours {4, 12, 20} UTC (3×/day)
+#   special-traffic                   → hours {6, 14, 22} UTC (3×/day)
+#
+# On workflow_dispatch (manual), all 6 jobs run regardless of hour.
+
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "0 */2 * * *"
   workflow_dispatch:
 
 jobs:
   # Job 1: Core commerce (checkout, browsing, user activity, seller)
   core-traffic:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,13 +34,15 @@ jobs:
         working-directory: cartnova/traffic
         env:
           JOB_TYPE: core
-          DURATION_MINUTES: "9"
+          DURATION_MINUTES: "2"
+          MAX_REQUESTS_PER_RUN: "700"
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: npx tsx src/ci-runner.ts
 
   # Job 2: Expanded domains (admin, inventory, finance, marketing, etc.)
   expanded-traffic:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -39,13 +54,15 @@ jobs:
         working-directory: cartnova/traffic
         env:
           JOB_TYPE: expanded
-          DURATION_MINUTES: "9"
+          DURATION_MINUTES: "2"
+          MAX_REQUESTS_PER_RUN: "500"
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: npx tsx src/ci-runner.ts
 
   # Job 3: Error traffic + bots/crawlers
   errors-bots-traffic:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -57,13 +74,15 @@ jobs:
         working-directory: cartnova/traffic
         env:
           JOB_TYPE: errors-bots
-          DURATION_MINUTES: "9"
+          DURATION_MINUTES: "2"
+          MAX_REQUESTS_PER_RUN: "400"
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: npx tsx src/ci-runner.ts
 
   # Job 4: GraphQL traffic (queries + mutations, browser + mobile)
   graphql-traffic:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -75,13 +94,15 @@ jobs:
         working-directory: cartnova/traffic
         env:
           JOB_TYPE: graphql
-          DURATION_MINUTES: "9"
+          DURATION_MINUTES: "2"
+          MAX_REQUESTS_PER_RUN: "400"
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: npx tsx src/ci-runner.ts
 
   # Job 5: Rate limiting + versioning drift + mixed patterns
   special-traffic:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -93,7 +114,9 @@ jobs:
         working-directory: cartnova/traffic
         env:
           JOB_TYPE: special
-          DURATION_MINUTES: "9"
+          DURATION_MINUTES: "2"
+          MAX_REQUESTS_PER_RUN: "500"
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: npx tsx src/ci-runner.ts
 
   # Job 6: API Shield attack patterns (5a-5f)
@@ -101,7 +124,7 @@ jobs:
   # enumeration, shadow API probing
   attack-traffic:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -113,5 +136,7 @@ jobs:
         working-directory: cartnova/traffic
         env:
           JOB_TYPE: attacks
-          DURATION_MINUTES: "9"
+          DURATION_MINUTES: "2"
+          MAX_REQUESTS_PER_RUN: "500"
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
         run: npx tsx src/ci-runner.ts

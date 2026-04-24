@@ -44,7 +44,7 @@ A mid-size bank that's been digitizing for 12 years. Chaotic API surface, 100-15
 
 **Frontend** (`cartnova/api/public/`) -- Vanilla HTML/CSS/JS e-commerce site served from the same Worker via Cloudflare Workers static assets. 9 pages covering all user-facing endpoints. Each page shows an "API Endpoints" annotation panel mapping UI actions to the API calls they trigger.
 
-**Traffic Generator** (`cartnova/traffic/`) -- Separate Cloudflare Worker with a Cron trigger (`* * * * *`). Simulates 20-25 concurrent users per minute across 4 journey types (checkout, browsing, user activity, seller). Generates ~9,000-14,000 requests/hour with human-like pacing and staggered arrivals. Deployed as `cartnova-traffic`.
+**Traffic Generator** (`cartnova/traffic/`) -- Separate Cloudflare Worker with a Cron trigger (`0 */2 * * *`, every 2 hours). Dispatches a GitHub Actions workflow that runs traffic from outside Cloudflare's network (so requests actually hit API Shield / Security Analytics). Tuned to ~15-20K requests/day (20% of the free Workers plan 100K/day limit). See "Traffic Budget" section below for the full tuning. Deployed as `cartnova-traffic`.
 
 **Intentional vulnerabilities** baked into the API for testing:
 - BOLA on `GET /orders/:order_id` and `GET /orders/:order_id/tracking` (no ownership check)
@@ -100,7 +100,7 @@ API-Shield-Demo-Companies/
         js/{page}.js                     #   Per-page logic (home, product, cart, etc.)
     specs/                               # (empty) OpenAPI specs for schema validation
     traffic/                             # Automated traffic generator (Cloudflare Worker)
-      wrangler.toml                      #   Cron trigger: * * * * *
+      wrangler.toml                      #   Cron trigger: 0 */2 * * *
       src/
         index.ts                         #   Cron handler + orchestrator
         config.ts                        #   Users, products, sellers, addresses, search terms
@@ -127,15 +127,15 @@ API-Shield-Demo-Companies/
 | Service | Worker Name | Domain / URL | Cron |
 |---------|-------------|--------------|------|
 | CartNova API + Frontend | `cartnova-api` | `carnova.uk` | -- |
-| CartNova Traffic Generator | `cartnova-traffic` | `cartnova-traffic.petras-leonardas.workers.dev` | `* * * * *` |
+| CartNova Traffic Generator | `cartnova-traffic` | `cartnova-traffic.petras-leonardas.workers.dev` | `0 */2 * * *` |
 
 Cloudflare account ID: `0644b2da0e70bd12883572fd98db4874`
 
 ## Traffic Kill Switch
 
-The traffic generator has a kill switch to pause/resume all automated traffic. This exists because the personal Cloudflare account ("Leo Designs the World") is on the free Workers plan with a 100,000 requests/day limit, and the traffic generator can produce 100K+ requests/day.
+The traffic generator has a kill switch to pause/resume all automated traffic. This exists because the personal Cloudflare account ("Leo Designs the World") is on the free Workers plan with a 100,000 requests/day limit. The generator has been tuned down to ~15-20K requests/day (20% of the free tier), but the kill switch remains as a safety net.
 
-**Current state: PAUSED (TRAFFIC_ENABLED = false)**
+**Current state: ACTIVE (TRAFFIC_ENABLED = true, targeting ~20% of free plan budget)**
 
 **The switch:** A single constant `TRAFFIC_ENABLED` in `cartnova/traffic/src/config.ts` (line 7).
 
@@ -199,17 +199,45 @@ The traffic generator has a kill switch to pause/resume all automated traffic. T
 
 ## Traffic Generator Details
 
-The `cartnova-traffic` Worker runs every minute and simulates realistic e-commerce activity:
+The `cartnova-traffic` Worker fires every 2 hours (`0 */2 * * *`) and dispatches a GitHub Actions workflow that generates traffic from outside Cloudflare's network. The generator is tuned to stay under **~20,000 requests/day** (20% of the free Workers plan's 100K/day limit on `carnova.uk`). That leaves ~80% of the free tier for manual testing, the Cloudflare dashboard, frontend browsing, and any unexpected bursts.
 
-| Journey | Users/batch | Endpoints covered | Stagger |
-|---------|-------------|-------------------|---------|
-| Checkout | 6-8 | 14 (login through order confirmation) | 0-20s |
-| Browsing | 10-12 | 6 (search, categories, products, reviews) | 0-15s |
-| User Activity | 3-4 | 10 (profile, orders, tracking, reviews) | 0-25s |
-| Seller | 1-2 | 5 (listings, analytics, orders) | 0-30s |
-| Monitoring | 1 | 2 (internal health + metrics) | 0-10s |
+### Traffic Budget
 
-Covers 35 of 37 endpoints (webhooks excluded -- need mTLS). Human-like delays (200-1500ms) between requests within each journey. Manual trigger: `POST https://cartnova-traffic.petras-leonardas.workers.dev/run`.
+| Control | Value | Rationale |
+|---------|-------|-----------|
+| Cron cadence | `0 */2 * * *` (12 runs/day) | Spreads activity across every hour of the day |
+| Jobs per run | 3 of 6 | core + attacks always; 1 rotating (expanded/graphql/errors-bots/special) |
+| Duration per job | 2 minutes | ~2 batches per job per run |
+| Hard request cap per run | 400-700 per job | Set via `MAX_REQUESTS_PER_RUN` in the GHA workflow; runner exits early if hit |
+| `TRAFFIC_ENABLED` kill switch | on | Flip to `false` in `src/config.ts` to pause all traffic |
+
+### Job Rotation Schedule (UTC)
+
+| Job | Hours | Runs/day |
+|-----|-------|----------|
+| core | every scheduled run | 12 |
+| attacks | every scheduled run | 12 |
+| expanded | 00, 08, 16 | 3 |
+| graphql | 02, 10, 18 | 3 |
+| errors-bots | 04, 12, 20 | 3 |
+| special | 06, 14, 22 | 3 |
+
+Rotation is enforced inside `src/ci-runner.ts` based on `GITHUB_EVENT_NAME`. On `schedule` runs, rotating jobs exit early if the current UTC hour isn't in their allowed list. On `workflow_dispatch` (manual triggers), all 6 jobs run regardless.
+
+### Per-Batch Coverage (reduced to fit budget)
+
+| Job | What runs per batch |
+|-----|---------------------|
+| core | 2 waves of browse+checkout+user/seller + monitoring |
+| expanded | 2 expanded domain journeys + 1 webhook |
+| errors-bots | errors + crawler + 50% chance each of scanner/uptime |
+| graphql | 1 browser + 1 mobile GraphQL session |
+| special | 1 of {rate-limit, legacy-mobile, mixed-version} + 20% future-version |
+| attacks | 3 of 6 attack patterns, alternating by batch number |
+
+Attack burst sizes were also reduced: rate-limit abuse 100→30 requests, BOLA enumeration 90→29 attempts, shadow API probing 15→5 paths, JWT endpoint fan-out 4→2 endpoints per attack variant.
+
+Covers 35 of 37 endpoints (webhooks excluded -- need mTLS). Human-like delays (200-1500ms) between requests within each journey. Manual trigger the full workflow (bypasses rotation): `gh workflow run traffic.yml` or the "Run workflow" button in GitHub Actions. Manually trigger just the scheduler Worker: `POST https://cartnova-traffic.petras-leonardas.workers.dev/trigger`.
 
 ## How Sessions in This Project Typically Work
 

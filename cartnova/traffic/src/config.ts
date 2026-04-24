@@ -5,7 +5,9 @@
 // Set to false to pause ALL automated traffic generation.
 // Set back to true and redeploy to resume.
 // Why: Free Workers plan has 100K requests/day limit on the personal account.
-export const TRAFFIC_ENABLED = false;
+// The generator is tuned to ~15-20K requests/day (20% of the free tier).
+// See .github/workflows/traffic.yml and src/ci-runner.ts for budget controls.
+export const TRAFFIC_ENABLED = true;
 
 export const BASE_URL = "https://carnova.uk";
 

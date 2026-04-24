@@ -13,6 +13,13 @@
 //   attacks     — API Shield attack patterns (5a-5f): rate limit abuse,
 //                 sequence violations, BOLA, JWT attacks, enumeration,
 //                 shadow API probing
+//
+// Budget controls (to stay under the free Workers plan 100K/day):
+//   DURATION_MINUTES       — max wall-clock runtime (default 2)
+//   MAX_REQUESTS_PER_RUN   — hard request cap per run (default 700)
+//   GITHUB_EVENT_NAME      — "schedule" enforces the job rotation table;
+//                            "workflow_dispatch" bypasses rotation so manual
+//                            triggers always run every job.
 
 import { checkoutJourney } from "./journeys/checkout";
 import { browsingJourney } from "./journeys/browsing";
@@ -37,8 +44,24 @@ import {
 import { api, getResults, setClientProfile, randomClientProfile } from "./http";
 import { TRAFFIC_ENABLED } from "./config";
 
-const DURATION_MS = (parseInt(process.env.DURATION_MINUTES || "4") || 4) * 60 * 1000;
+const DURATION_MS = (parseInt(process.env.DURATION_MINUTES || "2") || 2) * 60 * 1000;
 const JOB_TYPE = process.env.JOB_TYPE || "core";
+const MAX_REQUESTS_PER_RUN = parseInt(process.env.MAX_REQUESTS_PER_RUN || "700");
+const GITHUB_EVENT_NAME = process.env.GITHUB_EVENT_NAME || "workflow_dispatch";
+
+// Hour-based rotation table (UTC). Rotating jobs only fire on scheduled runs
+// at these hours. Manual workflow_dispatch bypasses this entirely.
+//   core, attacks           → always (every scheduled run)
+//   expanded                → 3×/day
+//   graphql                 → 3×/day
+//   errors-bots             → 3×/day
+//   special                 → 3×/day
+const ROTATING_JOBS: Record<string, number[]> = {
+  expanded: [0, 8, 16],
+  graphql: [2, 10, 18],
+  "errors-bots": [4, 12, 20],
+  special: [6, 14, 22],
+};
 
 const EXPANDED_POOL = [
   adminJourney, inventoryJourney, marketingJourney, supportJourney,
@@ -59,19 +82,16 @@ async function wave(...fns: [string, () => Promise<void>][]): Promise<void> {
 }
 
 // ── Batch Definitions Per Job Type ──────────────────────────────────
+// Reduced from ~5 waves per batch to ~2 waves per batch to hit the
+// 20%-of-free-plan budget target.
 
 async function coreBatch(): Promise<void> {
   setClientProfile(randomClientProfile());
-  await wave(["browse-1", browsingJourney], ["browse-2", browsingJourney], ["checkout-1", checkoutJourney]);
+  await wave(["browse-1", browsingJourney], ["checkout-1", checkoutJourney], ["user-1", userActivityJourney]);
   setClientProfile(randomClientProfile());
-  await wave(["browse-3", browsingJourney], ["checkout-2", checkoutJourney], ["user-1", userActivityJourney]);
-  setClientProfile(randomClientProfile());
-  await wave(["browse-4", browsingJourney], ["checkout-3", checkoutJourney], ["seller-1", sellerJourney]);
-  setClientProfile(randomClientProfile());
-  await wave(["browse-5", browsingJourney], ["checkout-4", checkoutJourney], ["user-2", userActivityJourney]);
-  setClientProfile(randomClientProfile());
-  await wave(["browse-6", browsingJourney], ["checkout-5", checkoutJourney], ["browse-7", browsingJourney]);
+  await wave(["browse-2", browsingJourney], ["checkout-2", checkoutJourney], ["seller-1", sellerJourney]);
 
+  // Monitoring (lightweight, once per batch)
   await safe("monitoring", async () => {
     await api("GET", "/internal/health");
     await api("GET", "/internal/metrics");
@@ -79,81 +99,83 @@ async function coreBatch(): Promise<void> {
 }
 
 async function expandedBatch(): Promise<void> {
-  const expanded = pickRandom(EXPANDED_POOL, 6);
-  setClientProfile("desktop");
+  // Down from 6 expanded journeys per batch → 2, plus 1 webhook.
+  const expanded = pickRandom(EXPANDED_POOL, 2);
+  setClientProfile(randomClientProfile());
   await wave(["exp-1", expanded[0]], ["exp-2", expanded[1]]);
-  setClientProfile("mobile");
-  await wave(["exp-3", expanded[2]], ["exp-4", expanded[3]]);
-  setClientProfile("integration");
-  await wave(["exp-5", expanded[4]], ["exp-6", expanded[5]]);
 
   await safe("webhook-1", webhookJourney);
-  await safe("webhook-2", webhookJourney);
 }
 
 async function errorsBotsBatch(): Promise<void> {
   setClientProfile("desktop");
   await safe("errors", errorTrafficJourney);
   await safe("crawler", searchCrawlerJourney);
-  await safe("scanner", scannerJourney);
-  await safe("uptime", uptimeMonitorJourney);
-  if (Math.random() < 0.5) {
-    await safe("scraper", scraperJourney);
-  }
-  await safe("webhook", webhookJourney);
+  // Scanner / uptime / scraper are sampled rather than always running.
+  if (Math.random() < 0.5) await safe("scanner", scannerJourney);
+  if (Math.random() < 0.5) await safe("uptime", uptimeMonitorJourney);
 }
 
 async function graphqlBatch(): Promise<void> {
-  // Browser GraphQL session
+  // Down from 4 GraphQL sessions per batch → 2 (one browser, one mobile).
   await safe("graphql-browser", graphqlJourney);
-  // Mobile GraphQL session
   await safe("graphql-mobile", mobileGraphqlJourney);
-  // Another browser session with different user
-  await safe("graphql-browser-2", graphqlJourney);
-  // Another mobile session
-  await safe("graphql-mobile-2", mobileGraphqlJourney);
 }
 
 async function specialBatch(): Promise<void> {
-  // Rate limiting tests
-  await safe("rate-limit", rateLimitJourney);
-  // Legacy mobile on v1
-  await safe("legacy-mobile", legacyMobileJourney);
-  // Partner mid-migration (v1+v2 mix)
-  await safe("mixed-version", mixedVersionJourney);
-  // Developer trying v3
-  await safe("future-version", futureVersionJourney);
-  // Extra browsing for volume
-  setClientProfile(randomClientProfile());
-  await wave(["browse-1", browsingJourney], ["browse-2", browsingJourney]);
+  // Sample from the special pool rather than running everything every batch.
+  const coin = Math.random();
+  if (coin < 0.33) {
+    await safe("rate-limit", rateLimitJourney);
+  } else if (coin < 0.66) {
+    await safe("legacy-mobile", legacyMobileJourney);
+  } else {
+    await safe("mixed-version", mixedVersionJourney);
+  }
+
+  // Occasional future-version probe
+  if (Math.random() < 0.2) {
+    await safe("future-version", futureVersionJourney);
+  }
 }
 
-async function attacksBatch(): Promise<void> {
-  // Run all 6 attack patterns per batch. Each pattern targets a
-  // specific API Shield feature. Interleave with legitimate traffic
-  // so the contrast between normal and malicious is visible in analytics.
-  await safe("5a-rate-abuse", attackRateLimitAbuse);
-  await safe("5b-seq-skip", attackSequenceSkipToConfirm);
-  await safe("5c-cross-user", attackCrossUserCheckout);
-  await safe("5d-jwt-attacks", attackJwtAttacks);
-  await safe("5e-bola-enum", attackBolaEnumeration);
-  await safe("5f-shadow-api", attackShadowApiProbing);
-
-  // Interleave some legitimate traffic for contrast
-  setClientProfile(randomClientProfile());
-  await wave(["legit-browse", browsingJourney], ["legit-checkout", checkoutJourney]);
+async function attacksBatch(batchNum: number): Promise<void> {
+  // Run only 3 of 6 attack patterns per batch, alternating by batch number.
+  // Over several batches in a run, all 6 patterns still get exercised.
+  if (batchNum % 2 === 0) {
+    await safe("5a-rate-abuse", attackRateLimitAbuse);
+    await safe("5c-cross-user", attackCrossUserCheckout);
+    await safe("5e-bola-enum", attackBolaEnumeration);
+  } else {
+    await safe("5b-seq-skip", attackSequenceSkipToConfirm);
+    await safe("5d-jwt-attacks", attackJwtAttacks);
+    await safe("5f-shadow-api", attackShadowApiProbing);
+  }
 }
 
 // ── Main Loop ───────────────────────────────────────────────────────
 
-const BATCH_FNS: Record<string, () => Promise<void>> = {
-  core: coreBatch,
-  expanded: expandedBatch,
-  "errors-bots": errorsBotsBatch,
-  graphql: graphqlBatch,
-  special: specialBatch,
-  attacks: attacksBatch,
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const BATCH_FNS: Record<string, (batchNum: number) => Promise<void>> = {
+  core: () => coreBatch(),
+  expanded: () => expandedBatch(),
+  "errors-bots": () => errorsBotsBatch(),
+  graphql: () => graphqlBatch(),
+  special: () => specialBatch(),
+  attacks: (batchNum: number) => attacksBatch(batchNum),
 };
+
+function isJobRotationAllowed(): boolean {
+  // Manual triggers always run every job.
+  if (GITHUB_EVENT_NAME === "workflow_dispatch") return true;
+
+  // Core and attacks always run on schedule.
+  if (!(JOB_TYPE in ROTATING_JOBS)) return true;
+
+  // Rotating jobs only run at their designated hours.
+  const hour = new Date().getUTCHours();
+  return ROTATING_JOBS[JOB_TYPE].includes(hour);
+}
 
 async function main() {
   if (!TRAFFIC_ENABLED) {
@@ -161,7 +183,14 @@ async function main() {
     process.exit(0);
   }
 
-  const batchFn = BATCH_FNS[JOB_TYPE] || coreBatch;
+  if (!isJobRotationAllowed()) {
+    const hour = new Date().getUTCHours();
+    const allowedHours = ROTATING_JOBS[JOB_TYPE]?.join(", ") || "always";
+    console.log(`[${JOB_TYPE}] Not scheduled for hour ${hour} UTC (runs at: ${allowedHours} UTC). Exiting.`);
+    process.exit(0);
+  }
+
+  const batchFn = BATCH_FNS[JOB_TYPE] || BATCH_FNS.core;
   const deadline = Date.now() + DURATION_MS;
   let batchNum = 0;
   let totalRequests = 0;
@@ -171,12 +200,14 @@ async function main() {
   console.log(`Job type: ${JOB_TYPE}`);
   console.log(`Target: https://carnova.uk`);
   console.log(`Duration: ${DURATION_MS / 60000} minutes`);
+  console.log(`Max requests per run: ${MAX_REQUESTS_PER_RUN}`);
+  console.log(`Trigger: ${GITHUB_EVENT_NAME}`);
   console.log(`Started: ${new Date().toISOString()}\n`);
 
   while (Date.now() < deadline) {
     batchNum++;
     console.log(`Batch #${batchNum}:`);
-    await batchFn();
+    await batchFn(batchNum);
 
     const results = getResults();
     const ok = results.filter((r) => r.ok).length;
@@ -184,6 +215,11 @@ async function main() {
 
     totalRequests += results.length;
     totalOk += ok;
+
+    if (totalRequests >= MAX_REQUESTS_PER_RUN) {
+      console.log(`  Request budget (${MAX_REQUESTS_PER_RUN}) reached. Exiting early.`);
+      break;
+    }
 
     if (Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 1000));
