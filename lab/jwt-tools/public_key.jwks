@@ -1,0 +1,12 @@
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "alg": "RS256",
+      "use": "sig",
+      "kid": "petstore-rs256",
+      "n": "o53JrLd9gUWj4QWnITfARtmAKJWWeDAxumLR1VQqYHs1pbCitu74vPqS6avf4Z4nfwpMPvMzjMfjBGWodYvKePCqvONK9PMQA3yGPIARuNsh5_qj6F6XZcZnOp6qwDnL5mfi8KmJyh7J65kJwqNAkzvpYrULi6D7IYtEtnkBhpokfxW_RVgxC_iNkV559uYWC4y6L1eO1SyJ8MSCpckQ0dTCTVjlUM0vxL2sIy7oxShtdahxuumM2_x5-IX-WBGr8_er7oaKpY67fhWJdMViDxqYliZnh2_QYDhK6WStou6hskyWUyyHNrR2Tba-hcDllhsyp515q_4YmLpdxKXkVw",
+      "e": "AQAB"
+    }
+  ]
+}

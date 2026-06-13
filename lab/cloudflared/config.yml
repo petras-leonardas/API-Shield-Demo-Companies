@@ -1,0 +1,21 @@
+# cloudflared tunnel configuration for the Cartnova lab.
+# Mounted into the cloudflared container at /etc/cloudflared/config.yml.
+#
+# Tunnel UUID is fixed at lab-bootstrap time (Phase 1) and references the
+# credentials file mounted from ~/.cloudflared/<uuid>.json.
+
+tunnel: 1b048a4d-1d6d-4c05-a6fe-de60fe081e78
+credentials-file: /etc/cloudflared/1b048a4d-1d6d-4c05-a6fe-de60fe081e78.json
+
+# Don't try to update the daemon binary at runtime.
+no-autoupdate: true
+
+# Ingress rules: Cloudflare edge -> tunnel -> these targets.
+# The cloudflared container reaches the petstore service via Docker's internal
+# DNS (service name "petstore"), on the port the petstore container exposes.
+ingress:
+  - hostname: petstore.carnova.uk
+    service: http://petstore:8080
+  # Default catch-all -- anything that lands on the tunnel without matching a
+  # hostname above gets a 404. Keeps the tunnel from accidentally serving other apps.
+  - service: http_status:404

@@ -1,0 +1,39 @@
+# Cartnova lab -- Emmanuel-style imaged-app demo stack.
+#
+# Brings up:
+#   - petstore     : Swagger Petstore v3 (the JWT validation flagship demo target)
+#   - cloudflared  : Tunnel connector that publishes petstore at petstore.carnova.uk
+#
+# Both services share the default Docker network so cloudflared can reach
+# petstore by service name (http://petstore:8080).
+#
+# Phase 1 (already done) created the tunnel + DNS record via the Cloudflare API.
+# Bringing this stack up lights the connector so the tunnel goes from
+# "inactive" to "healthy" and traffic starts flowing.
+
+services:
+  petstore:
+    image: swaggerapi/petstore3:latest
+    # Image is amd64-only; on Apple Silicon this runs under Rosetta emulation.
+    # Performance is fine for a demo. Comment out the platform line if running on amd64.
+    platform: linux/amd64
+    container_name: cartnova-lab-petstore
+    restart: unless-stopped
+    expose:
+      - "8080"
+    # No ports: section -- petstore is reachable only via cloudflared, not on localhost.
+    # Add a "ports" line here if you want to also poke it directly during debugging.
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cartnova-lab-cloudflared
+    restart: unless-stopped
+    # Run the tunnel in foreground mode using the local config file.
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      # Tunnel ingress + UUID config
+      - ./cloudflared/config.yml:/etc/cloudflared/config.yml:ro
+      # Tunnel credentials file (TunnelSecret + TunnelID + AccountTag)
+      - ${HOME}/.cloudflared/1b048a4d-1d6d-4c05-a6fe-de60fe081e78.json:/etc/cloudflared/1b048a4d-1d6d-4c05-a6fe-de60fe081e78.json:ro
+    depends_on:
+      - petstore

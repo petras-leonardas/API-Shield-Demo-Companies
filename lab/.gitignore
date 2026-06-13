@@ -1,0 +1,15 @@
+# Tunnel credentials and tokens -- never commit
+*.json
+!docker-compose.json
+
+# JWT key material -- never commit
+jwt-tools/private_key.pem
+jwt-tools/public_key.pem
+jwt-tools/public_key.jwk
+jwt-tools/.venv/
+jwt-tools/__pycache__/
+jwt-tools/*.pyc
+
+# Local artifacts
+.env
+.DS_Store
