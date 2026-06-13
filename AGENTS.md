@@ -2,20 +2,20 @@
 
 ## Project Overview
 
-This is a lab environment for testing Cloudflare's API Shield product using two fictitious companies. The project owner is Leo, a product designer on the Application Security team at Cloudflare.
+This is a lab environment for testing Cloudflare's API Shield product. The project owner is Leo, a product designer on the Application Security team at Cloudflare.
 
 The goal is to create realistic mock API traffic through Cloudflare so that every API Shield feature can be tested firsthand -- from endpoint discovery through enforcement. This directly supports UX research into why customers struggle to adopt API Shield (documented in the sibling project `API-security-discovery-interviews/`).
 
-## Why Two Companies
+## Approach
 
 Research from 8 internal interviews revealed a sharp divide between two types of API Shield customers:
 
 - **Digital-native companies** self-serve successfully. They know their APIs, have schemas, and configure security on day one.
 - **Enterprise companies** stall after discovery. They have sprawling, undocumented API surfaces and can't progress past the "now what?" moment.
 
-This project recreates both scenarios so Leo can walk the full API Shield journey from each perspective.
+This project originally planned a second from-scratch fake application (MeridianBank) to represent the enterprise case. That approach has been abandoned. Instead, the enterprise sprawl scenario will be reproduced the way Cloudflare SE Emmanuel Francis does in his own lab: by pulling ready-made Docker images (Swagger Petstore, OWASP Juice Shop, Grafana, Kibana, httpbin) from public registries and publishing them as subdomains of a single Cloudflare zone via a `cloudflared` tunnel. See `Emmanuel's setup/` for the captured walkthrough and wiki pages documenting that approach.
 
-## The Two Companies
+## The Company
 
 ### CartNova -- Digital Native E-Commerce Marketplace
 
@@ -27,14 +27,11 @@ A modern, 4-year-old multi-category e-commerce marketplace. API-first, clean arc
 - **Key test:** Walk from discovery through schema validation, JWT rules, sequence mitigation on the checkout flow, and enforcement.
 - **Success metric:** Achieve Nuno's benchmark -- 80% of discovered endpoints saved, 10% with active rules.
 
-### MeridianBank -- Enterprise Financial Services
+### Enterprise sprawl scenario (Emmanuel-style lab, not yet built)
 
-A mid-size bank that's been digitizing for 12 years. Chaotic API surface, 100-150+ endpoints across 6 different architectural eras, no central governance. Represents the **Discovery Plateauer** persona.
+Instead of building a second mock application, enterprise sprawl will be reproduced by adding Docker-image-based apps as additional subdomains on the CartNova zone (or a separate lab zone -- decision pending). This means the same zone will host a clean, designed marketplace (CartNova) alongside ad-hoc, off-the-shelf apps (Petstore, Juice Shop, Grafana, etc.) -- mirroring how real enterprise customers see multiple applications and authentication mechanisms under a single domain.
 
-- **Status:** Planning docs complete, implementation not started
-- **Purpose:** Experience the failure path. What does the discovery plateau feel like with 150+ messy endpoints?
-- **Key test:** Run discovery, see the wall of endpoints, and try to make progress. Identify exactly where and why you stall.
-- **Success metric:** There isn't one -- that's the point. Document where the experience breaks down.
+See `Emmanuel's setup/transcript.md` and the sibling wiki captures for the reference implementation.
 
 ## Current State -- What's Built
 
@@ -51,10 +48,6 @@ A mid-size bank that's been digitizing for 12 years. Chaotic API surface, 100-15
 - BOLA on `GET /checkout/:checkout_id/status` (no ownership check)
 - Internal endpoints (`/internal/health`, `/internal/metrics`, `/internal/cache/invalidate`) exposed with zero auth
 - JWT secret in source code (intentional -- traffic generator needs it to create tokens)
-
-### MeridianBank (Planning Only)
-
-Planning docs are complete (company profile, API architecture, traffic plan, sprawl design). No code has been implemented.
 
 ## Project Structure
 
@@ -109,14 +102,6 @@ API-Shield-Demo-Companies/
         journeys/browsing.ts             #   Guest browsing (3 patterns: search, category, catalog)
         journeys/seller.ts               #   Seller dashboard activity (API key auth)
         journeys/user-activity.ts        #   Account management, orders, reviews, returns
-  meridianbank/
-    company-profile.md                   # Business model, history, organizational dysfunction
-    api-architecture.md                  # Full endpoint inventory, auth mess, shadow APIs
-    traffic-plan.md                      # Scripted journeys and attack patterns
-    sprawl-design.md                     # How the endpoint generator creates organic mess
-    api/                                 # (not started)
-    generator/                           # (not started)
-    traffic/                             # (not started)
   shared/
     feature-test-map.md                  # API Shield features mapped to test scenarios
     project-plan.md                      # Original implementation plan (6 phases)
@@ -241,12 +226,13 @@ Covers 35 of 37 endpoints (webhooks excluded -- need mTLS). Human-like delays (2
 
 ## How Sessions in This Project Typically Work
 
-- **Building mock APIs**: Implementing Workers, routes, middleware, and seed data for each company
-- **Building frontends**: Creating UI pages that map visually to API endpoint groups
+- **Building the mock API**: Implementing Workers, routes, middleware, and seed data for CartNova
+- **Building the frontend**: Creating UI pages that map visually to API endpoint groups
 - **Building traffic generators**: Creating automated journey scripts that simulate real user patterns
-- **Refining company definitions**: Adjusting endpoints, auth patterns, or data as testing reveals gaps
+- **Refining the company definition**: Adjusting endpoints, auth patterns, or data as testing reveals gaps
 - **Deployment and configuration**: Setting up Cloudflare DNS, proxy, Workers, and API Shield configuration
 - **Testing API Shield features**: Running through discovery, schema validation, JWT rules, sequence mitigation, and enforcement using the live traffic and frontend
+- **Standing up the Emmanuel-style lab**: Pulling Docker images, wiring up a `cloudflared` tunnel, and publishing imaged apps as subdomains to produce enterprise-sprawl conditions on the same Cloudflare zone
 - **Documenting findings**: Recording what happened when testing each API Shield feature
 
 ## What's Left to Build
@@ -257,15 +243,19 @@ Covers 35 of 37 endpoints (webhooks excluded -- need mTLS). Human-like delays (2
 - **Attack traffic patterns** -- scripted sequences for rate limiting, BOLA enumeration, JWT attacks, sequence violations (defined in traffic-plan.md but not yet implemented)
 - **Cloudflare API Shield configuration** -- endpoint management, session identifiers, JWT rules, sequence rules, rate limiting
 
-### MeridianBank (not started)
-- Everything -- API server, endpoint sprawl generator, traffic scripts, deployment
+### Emmanuel-style lab (not started)
+- Provision infrastructure (decision pending: laptop + Docker, small cloud VM, or Cloudflare Containers)
+- Install `cloudflared` and register a tunnel
+- Bring up the Swagger Petstore, OWASP Juice Shop, Grafana, and httpbin as containers
+- Publish each as a subdomain on the chosen zone (likely `carnova.uk` subdomains to simulate mixed enterprise surfaces)
+- Replicate Emmanuel's JWT-validation demo against the Petstore specifically
 
 ## Research Connection
 
-This project is grounded in findings from the `API-security-discovery-interviews/` project. Key findings that shaped these demo companies:
+This project is grounded in findings from the `API-security-discovery-interviews/` project. Key findings that shaped this lab:
 
 - No participant (0 of 8) has seen a customer complete the full API Shield onboarding journey
-- The "discovery plateau" is the most common failure mode (hence MeridianBank)
+- The "discovery plateau" is the most common failure mode (which is why the enterprise-sprawl scenario matters, even if reproduced via imaged apps rather than a bespoke second company)
 - Digital-native companies self-serve successfully (hence CartNova)
 - Session identifiers are a critical bottleneck
 - JWT validation is the most valued but least-known feature
@@ -273,15 +263,15 @@ This project is grounded in findings from the `API-security-discovery-interviews
 
 ## Tech Stack
 
-- **Mock APIs:** TypeScript with Hono framework on Cloudflare Workers (originally planned as Node.js/Express, switched to Workers for simpler deployment)
-- **Frontend:** Vanilla HTML/CSS/JS with Tailwind CDN, served via Cloudflare Workers static assets
-- **Traffic Generation:** TypeScript Cloudflare Workers with Cron triggers
-- **Endpoint Sprawl (MeridianBank):** Generator script that creates 70-100+ additional endpoints with varied naming, auth, and versioning patterns (not yet built)
+- **Mock API (CartNova):** TypeScript with Hono framework on Cloudflare Workers (originally planned as Node.js/Express, switched to Workers for simpler deployment)
+- **Frontend (CartNova):** Vanilla HTML/CSS/JS with Tailwind CDN, served via Cloudflare Workers static assets
+- **Traffic Generation (CartNova):** TypeScript Cloudflare Workers with Cron triggers
+- **Enterprise sprawl (planned):** Off-the-shelf Docker images from public registries, run on a VPC or equivalent and exposed via `cloudflared` tunnel as additional subdomains on the same Cloudflare zone
 - **OpenAPI Specs (CartNova):** YAML specs for upload to API Shield schema validation (not yet written)
 
 ## Rules
 
-- **Keep companies distinct.** CartNova should feel clean and intentional. MeridianBank should feel messy and organic. Don't accidentally make MeridianBank too consistent.
-- **Realistic over clever.** The APIs don't need complex business logic. They need realistic URL patterns, auth mechanisms, response shapes, and traffic patterns.
+- **Keep CartNova clean and intentional.** When the Emmanuel-style lab goes live, its mess will provide the contrast -- don't pollute CartNova's endpoints or traffic profile with sprawl artefacts.
+- **Realistic over clever.** The API doesn't need complex business logic. It needs realistic URL patterns, auth mechanisms, response shapes, and traffic patterns.
 - **Trace to research.** Design decisions should map back to research findings. If a design choice doesn't connect to a real customer pattern, question whether it's needed.
 - **Frontend-API consistency.** When modifying API response shapes, audit the frontend JS files that consume them. The frontend was built after the API, and mismatches between response keys and JS property access have occurred before (e.g., `results` vs `products`, `author_name` vs `author`). Always cross-reference.

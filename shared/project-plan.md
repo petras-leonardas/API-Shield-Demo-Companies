@@ -2,194 +2,144 @@
 
 ## Overview
 
-This document outlines the implementation plan for building and deploying both demo companies. The goal is to get realistic API traffic flowing through Cloudflare so all 19 API Shield features documented at [developers.cloudflare.com/api-shield](https://developers.cloudflare.com/api-shield/) can be tested. See `feature-test-map.md` for the complete feature-to-scenario mapping.
+This document tracks the implementation plan for the API Shield demo lab. The goal is to get realistic API traffic flowing through Cloudflare so every API Shield feature documented at [developers.cloudflare.com/api-shield](https://developers.cloudflare.com/api-shield/) can be tested end-to-end. See `feature-test-map.md` for the feature-to-scenario mapping.
+
+> **Historical note.** An earlier version of this plan called for a second fictitious company (MeridianBank) to represent the enterprise-sprawl scenario. That approach has been abandoned. The enterprise scenario will instead be reproduced by standing up an Emmanuel-style lab -- a stack of off-the-shelf Docker images exposed via a `cloudflared` tunnel as additional subdomains on the same Cloudflare zone. See `AGENTS.md` → *Approach* and `Emmanuel's setup/` for the reference implementation.
 
 ---
 
-## Tech Stack
+## Tech Stack (actual)
 
-| Component | Technology | Why |
-|-----------|------------|-----|
-| Mock API servers | Node.js + Express | Simple, transparent route definitions. Easy to read and modify. |
-| GraphQL endpoint | `express-graphql` or `apollo-server-express` | For MeridianBank's GraphQL gateway. |
-| Traffic generation | Node.js scripts with `fetch()` | Same language as the servers. Configurable journey orchestration. |
-| Endpoint sprawl generator | Node.js script | Reads config, dynamically registers Express routes. |
-| OpenAPI specs | YAML files | For CartNova schema validation upload and Vulnerability Scanner input. |
-| JWT generation | `jsonwebtoken` npm package | Generate valid/invalid/expired test tokens. |
-| mTLS certificates | Self-signed CA + client certs | For CartNova webhooks and MeridianBank partner APIs. |
-| Deployment | Any server behind Cloudflare proxy | Traffic must route through Cloudflare for discovery to work. |
+| Component | Technology | Notes |
+|-----------|------------|-------|
+| Mock API (CartNova) | TypeScript + Hono on Cloudflare Workers | Originally planned as Node.js + Express; switched to Workers for simpler deployment. |
+| Frontend (CartNova) | Vanilla HTML/CSS/JS + Tailwind CDN | Served by the same Worker via Workers static assets. |
+| Traffic generation (CartNova) | TypeScript Cloudflare Worker + GitHub Actions | Cron Worker dispatches a GitHub Actions workflow that makes requests from outside Cloudflare (so traffic counts towards API Shield analytics). |
+| JWT generation | `jsonwebtoken` inside the traffic Worker | Valid, expired, and malformed tokens. |
+| OpenAPI spec (CartNova) | YAML | Not yet written. Needed for schema validation, vulnerability scanner, and dev portal. |
+| mTLS certificates (CartNova webhooks) | Self-signed CA + client certs | Not yet generated. |
+| Enterprise sprawl scenario | Off-the-shelf Docker images via `cloudflared` tunnel | Not yet built. See Phase 3 below. |
 
 ---
 
 ## Implementation Phases
 
-### Phase 1: CartNova Mock APIs
+### Phase 1: CartNova Mock API and Frontend -- DONE
 
-Build the CartNova Express server with all 37 endpoints.
+CartNova is fully operational on `carnova.uk`.
 
-**Tasks:**
-1. Initialize Node.js project in `cartnova/api/`
-2. Create route files for each endpoint group (products, cart, checkout, users, sellers, orders, webhooks, internal)
-3. Implement JWT auth middleware (validate Bearer tokens)
-4. Implement API key auth middleware (validate `X-Seller-Key`)
-5. Create seed data (products, users, categories) -- must include at least 2 distinct user accounts with separate data for Vulnerability Scanner BOLA testing
-6. Each endpoint returns realistic JSON responses with appropriate PII/sensitive data
-7. Write the OpenAPI spec (`cartnova-api-v2.yaml`) -- this serves triple duty: Schema Validation upload, Vulnerability Scanner input, and Developer Portal generation
-8. Generate self-signed CA and client certificates for mTLS webhook testing
+- 37 endpoints across 8 route groups implemented in Hono + TypeScript (`cartnova/api/`).
+- 9-page vanilla-JS frontend served from the same Worker (`cartnova/api/public/`).
+- Seed data for 3 users, 12 products, 4 orders, and 3 sellers.
+- Intentional vulnerabilities baked in: BOLA on order lookup and checkout status, exposed internal endpoints, JWT secret in source.
 
-**Endpoints to implement:** 37
-**Estimated complexity:** Low -- straightforward CRUD-like responses
+### Phase 2: CartNova Traffic Generator -- DONE
 
-### Phase 2: MeridianBank Mock APIs (Core)
+- Separate Cloudflare Worker (`cartnova-traffic`) with a cron trigger every 2 hours.
+- Dispatches a GitHub Actions workflow that runs journey scripts from outside Cloudflare.
+- Tuned to ~15-20K requests/day (20% of the free Workers plan's 100K/day limit).
+- Six job types -- `core`, `attacks`, `expanded`, `graphql`, `errors-bots`, `special` -- on a UTC rotation schedule.
+- Kill switch (`TRAFFIC_ENABLED` in `cartnova/traffic/src/config.ts`) to pause all traffic.
 
-Build the MeridianBank Express server with the ~40 core endpoints across 7 architectural styles.
+### Phase 3: Emmanuel-style enterprise-sprawl lab -- NOT STARTED
 
-**Tasks:**
-1. Initialize Node.js project in `meridianbank/api/`
-2. Create route files for each service group (mobile-banking, legacy-portal, partners, internal-services, wealth-management, card-services, graphql-gateway, deprecated)
-3. Implement multiple auth middlewares (JWT, API key, Basic Auth, none)
-4. Implement GraphQL gateway using `express-graphql` or `apollo-server-express` with schema for accounts, transactions, and transfers
-5. Enable GraphQL introspection and Playground on GET (intentional security misconfiguration)
-6. Each service group should use its own naming convention and response format
-7. Create seed data (accounts, customers, portfolios, cards)
-8. Internal/debug endpoints must return realistically sensitive data (risk scores, DB strings)
-
-**Endpoints to implement:** ~40
-**Estimated complexity:** Medium-High -- multiple auth patterns, response formats, and a GraphQL schema
-
-### Phase 3: MeridianBank Sprawl Generator
-
-Build the generator that creates 70-100 additional endpoints.
+Replaces the abandoned MeridianBank company. The goal is to reproduce the "many apps, fragmented auth, single zone" conditions that real enterprise customers see, using Docker images pulled from public registries instead of a bespoke second app.
 
 **Tasks:**
-1. Create generator script in `meridianbank/generator/`
-2. Implement each sprawl category (path variants, version ghosts, microservice leaks, etc.)
-3. Generator reads config and dynamically registers Express routes
-4. Test that generated endpoints return plausible responses
-5. Tune the total count and distribution
 
-**Endpoints to generate:** 70-100 (configurable)
-**Estimated complexity:** Medium -- needs to feel organic, not pattern-generated
+1. Decide on infrastructure host -- laptop + Docker, small always-on cloud VM (~$5/month), or Cloudflare Containers. Leaning towards a cloud VM for realism and 24/7 availability.
+2. Install `cloudflared` on the chosen host and register a tunnel against the CartNova Cloudflare account (or a separate lab zone -- decision pending).
+3. Bring up the core app stack as Docker containers:
+   - **Swagger Petstore** -- comes with an OpenAPI spec, so API Shield schema validation works out of the box.
+   - **OWASP Juice Shop** -- a second e-commerce surface with intentional vulnerabilities.
+   - **Grafana** (and/or Kibana) -- a realistic internal observability tool to populate Discovery with non-business traffic.
+   - **httpbin** -- a small, status-code-driven app for rate-limit demos.
+4. Publish each container as a subdomain on the chosen zone (for example `petstore.carnova.uk`, `juice.carnova.uk`).
+5. Replicate Emmanuel's JWT-validation demo against the Petstore: sensitive endpoint blocked by default, Python script generates a JWT, request succeeds. See `Emmanuel's setup/wiki-02-securing-apis-with-jwt-validation.md` and `wiki-03-implementing-jwt-validation-for-petstore-swagger-api.md` for the scripts.
+6. Decide whether to extend the CartNova traffic generator to drive these apps too, or keep it focused on CartNova and add a smaller separate trickle for the imaged apps.
 
-### Phase 4: Traffic Generation Scripts
+### Phase 4: Cloudflare API Shield configuration -- IN PROGRESS
 
-Build the journey scripts for both companies.
-
-**Tasks:**
-1. Create shared utilities (`jwt-generator.js`, `traffic-logger.js`)
-2. CartNova: Implement 6 journeys (checkout, browsing, seller, webhooks, vulnerability scanner setup, attacks)
-3. MeridianBank: Implement 7 journeys (modern banking, legacy portal, partners, internal leaks, shadow, wealth management, GraphQL gateway) + attacks (including GraphQL depth/size/introspection attacks)
-4. Build journey runner/orchestrator with configurable concurrency and intervals
-5. Add logging so sent traffic can be compared with what discovery finds
-6. Implement GraphQL-specific traffic: normal queries, nested queries, mutations, and attack queries
-
-### Phase 5: Cloudflare Configuration
-
-Set up the Cloudflare test account and configure DNS/proxy.
+With CartNova live and the Emmanuel-style lab planned, configure API Shield itself against the running traffic.
 
 **Tasks:**
-1. Create Cloudflare test account (or zone on existing account) with API Shield enabled
-2. Configure DNS records pointing to the deployed servers
-3. Ensure all traffic is proxied through Cloudflare (orange cloud)
-4. Verify API Shield discovery starts picking up traffic
-5. Configure session identifiers for both companies
-6. Upload mTLS client CA certificates for CartNova webhooks and MeridianBank partner APIs
-7. Set up Vulnerability Scanner target environment and credential sets for CartNova
-8. Document the Cloudflare configuration for reproducibility
 
-### Phase 6: Testing and Documentation
+1. Configure session identifiers for CartNova (`Authorization` header for buyers, `X-Seller-Key` for sellers).
+2. Upload the CartNova OpenAPI spec to Schema Validation once it exists. Start in log mode.
+3. Configure JWT validation rules for CartNova's authenticated endpoints.
+4. Upload mTLS client CA certificates for the CartNova webhook endpoints once certificates exist.
+5. Once the Emmanuel-style lab is live: add session identifiers matching each imaged app's auth mechanism, upload the Petstore OpenAPI spec, and configure JWT validation for the Petstore.
+6. Review Authentication Posture and Volumetric Abuse Detection recommendations once the new apps have ~24 hours of traffic.
+7. Configure sequence mitigation on the CartNova checkout flow (start → shipping → payment → confirm).
+8. Document the Cloudflare configuration for reproducibility.
 
-Run through both companies and document the experience across all 19 API Shield features.
+### Phase 5: Testing and documentation -- IN PROGRESS
+
+Walk each API Shield feature against the live lab and document the experience.
 
 **Tasks:**
-1. Run CartNova traffic for 24+ hours (needed for schema learning, volumetric abuse detection, authentication posture, and sequence analytics)
-2. Run MeridianBank traffic for 24+ hours with all 7 journeys active
-3. Walk through all 19 features in the feature test map (`feature-test-map.md`), documenting: what worked, what didn't, where the UX broke down
-4. Run the CartNova Vulnerability Scanner BOLA scan and document findings
-5. Test GraphQL Query Protection on MeridianBank's GraphQL gateway
-6. Generate Developer Portals for both companies and evaluate the output
-7. Test API Routing on MeridianBank as a consolidation mechanism
-8. Compare experience against research findings -- do the real interviews match the firsthand experience?
+
+1. Work through `feature-test-map.md` feature by feature, documenting what worked, what didn't, and where the UX broke down.
+2. Run CartNova's Vulnerability Scanner BOLA scan once the OpenAPI spec exists and document findings.
+3. Generate a Developer Portal from the CartNova spec and evaluate the output.
+4. Repeat scanner and dev-portal flows against the Petstore once the Emmanuel-style lab is up -- useful as a "spec I did not write" contrast.
+5. Capture observations as Deep Dives in `Deep Dives/`. Each deep dive should trace back to a research finding or a live testing result.
 
 ---
 
-## Deployment Options
+## Traffic Budget
 
-The mock API servers need to be accessible via the public internet through Cloudflare. Options:
+The project runs on the free Workers plan (100K requests/day on `carnova.uk`). The traffic generator is tuned to ~20% of that ceiling, leaving room for:
 
-| Option | Pros | Cons |
-|--------|------|------|
-| **Cloudflare Workers** | No server to manage. Free tier available. Ironic but practical. | May need adaptation from Express to Workers format. |
-| **VPS (e.g., DigitalOcean, Hetzner)** | Full control. Run Express directly. | Costs money. Needs basic server management. |
-| **Cloudflare Tunnel** | Run locally, expose through Cloudflare. No public server needed. | Slightly more setup. Depends on local machine being on. |
-| **Railway / Render / Fly.io** | Quick deploy from Git. Free tiers available. | Less control. May have cold start delays. |
+- Manual testing and the Cloudflare dashboard.
+- Frontend browsing during demos.
+- The planned Emmanuel-style lab subdomains (if traffic is extended to them).
+- Unexpected bursts.
 
-**Recommended:** Cloudflare Tunnel for development/testing (run locally, no server costs). Move to a VPS or Workers for sustained traffic generation.
+See `AGENTS.md` → *Traffic Budget* for the detailed tuning.
 
 ---
 
 ## Shared Utilities
 
-### JWT Generator (`shared/utils/jwt-generator.js`)
+### JWT generator
 
-Generates test JWT tokens for both companies:
-- Valid tokens (correct signature, not expired, correct issuer)
-- Expired tokens (for JWT validation testing)
-- Wrong-issuer tokens
-- Tampered tokens (modified payload, original signature)
-- Tokens for different users (for BOLA testing)
+Lives inside the CartNova traffic Worker. Generates valid, expired, and malformed tokens for testing.
 
-### Traffic Logger (`shared/utils/traffic-logger.js`)
+### Traffic Logger
 
-Logs all traffic sent by the journey scripts:
-- Timestamp, method, path, status code, response time
-- Can be compared with API Shield discovery output to verify completeness
-- Exportable as CSV for analysis
+GitHub Actions workflow logs every journey run. Logs can be compared with API Shield Discovery output to verify completeness.
 
 ---
 
 ## Success Criteria
 
-### CartNova (Happy Path -- 19 features)
-- [ ] All 37 endpoints discovered by API Shield
-- [ ] All endpoints saved and organized in Endpoint Management
-- [ ] Managed labels applied (cf-log-in, cf-sign-up, cf-add-cart, cf-purchase, cf-add-payment, cf-add-post)
-- [ ] Schema learning output compared against authoritative OpenAPI spec
-- [ ] OpenAPI schema uploaded and schema validation active (log then enforce)
-- [ ] JWT validation rules active and tested (valid, expired, tampered, wrong-issuer tokens)
-- [ ] mTLS configured for webhook endpoints
-- [ ] Session identifier configured (Authorization header)
-- [ ] Authentication Posture reviewed (public endpoints flagged, internal endpoints flagged)
-- [ ] Volumetric Abuse Detection rate limit recommendations appear and are applied
-- [ ] Checkout sequence visible in Sequence Analytics with high correlation score
-- [ ] Checkout sequence mitigation rules defined and enforced
-- [ ] BOLA detection risk labels appear on vulnerable endpoints
-- [ ] Vulnerability Scanner BOLA scan completed with actionable results
-- [ ] Sensitive data detected in user/checkout endpoints (cf-risk-sensitive labels)
-- [ ] Developer Portal generated from OpenAPI spec and deployed
-- [ ] API Routing tested (v3 to v2 route)
-- [ ] Full journey from discovery to enforcement completed across all applicable features
+### CartNova (happy path)
 
-### MeridianBank (Failure Path -- 19 features)
-- [ ] 150+ endpoints visible in discovery (including GraphQL)
-- [ ] Discovery output feels overwhelming and unactionable
-- [ ] Path variable variants clutter the list
-- [ ] Multiple API styles (REST, SOAP, GraphQL) interleaved with no grouping
-- [ ] Endpoint labeling attempted -- document whether it helps tame the sprawl
-- [ ] Schema learning produces usable output for mobile banking endpoints
-- [ ] Learned schema imported to schema validation (assess confidence)
-- [ ] JWT validation configured for /api/v3/ only (coverage gap documented)
-- [ ] mTLS configured for partner endpoints
-- [ ] Session identifier configuration blocked by auth fragmentation
-- [ ] Authentication Posture shows widespread cf-risk-missing-auth (internal + legacy endpoints)
-- [ ] Volumetric Abuse Detection recommendations spotty due to fragmented sessions
-- [ ] Sequence Analytics surfaces modern transfer flow (legacy flow status documented)
-- [ ] Sequence mitigation on modern flow only (legacy flow unprotected -- documented)
-- [ ] BOLA detection flags on account/internal endpoints
-- [ ] Learned schema tested as Vulnerability Scanner input (if viable)
-- [ ] Sensitive data (SSN, card numbers, DB strings) detected on unauthenticated endpoints
-- [ ] GraphQL Query Protection configured and tested (depth/size limits, introspection)
-- [ ] API Routing tested as consolidation mechanism
-- [ ] Developer Portal generated from learned schema (evaluate quality)
-- [ ] Internal/debug endpoints appear alongside public APIs
-- [ ] Document exactly where and why progress stalls for each feature
+- [ ] All 37 endpoints discovered by API Shield.
+- [ ] All endpoints saved and organised in Endpoint Management.
+- [ ] Managed labels applied (`cf-log-in`, `cf-sign-up`, `cf-add-cart`, `cf-purchase`, `cf-add-payment`, `cf-add-post`).
+- [ ] Schema learning output compared against authoritative OpenAPI spec.
+- [ ] OpenAPI schema uploaded and schema validation active (log, then enforce).
+- [ ] JWT validation rules active and tested with valid, expired, tampered, and wrong-issuer tokens.
+- [ ] mTLS configured for webhook endpoints.
+- [ ] Session identifiers configured (`Authorization`, `X-Seller-Key`).
+- [ ] Authentication Posture reviewed (public endpoints flagged, internal endpoints flagged).
+- [ ] Volumetric Abuse Detection rate-limit recommendations appear and are applied.
+- [ ] Checkout sequence visible in Sequence Analytics with a high correlation score.
+- [ ] Checkout sequence mitigation rules defined and enforced.
+- [ ] BOLA detection risk labels appear on the vulnerable order endpoints.
+- [ ] Vulnerability Scanner BOLA scan completed with actionable results.
+- [ ] Sensitive data detected in user/checkout/order endpoints (`cf-risk-sensitive` labels).
+- [ ] Developer Portal generated from the OpenAPI spec and deployed.
+- [ ] Nuno's benchmark hit: 80% of discovered endpoints saved, 10% with active rules.
+- [ ] Full journey from discovery to enforcement completed across every applicable feature.
+
+### Emmanuel-style lab (enterprise-sprawl stand-in)
+
+- [ ] Lab host provisioned and `cloudflared` tunnel registered.
+- [ ] Petstore, Juice Shop, Grafana, and httpbin live on lab subdomains.
+- [ ] Each app receives discoverable traffic.
+- [ ] Multiple session identifiers configured across the different apps' auth mechanisms.
+- [ ] Petstore JWT-validation demo reproduced end-to-end (sensitive endpoint → block → generate JWT → unblock).
+- [ ] Observations on how API Shield behaves under "mixed apps under one zone" conditions captured as a Deep Dive.
